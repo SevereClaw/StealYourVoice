@@ -22,6 +22,9 @@ public class SlashSlider : FrameworkElement
     public int Decimals { get; set; } = 1;
     public string Hint { get; set; } = "";
 
+    /// <summary>Fill from the centre (for -x..+x controls like tone).</summary>
+    public bool Bipolar { get; set; }
+
     public bool IsDragging { get; private set; }
 
     public double Value
@@ -119,7 +122,21 @@ public class SlashSlider : FrameworkElement
 
         var t = (Maximum - Minimum) <= 0 ? 0 : (_value - Minimum) / (Maximum - Minimum);
         var fillW = Slant + (r.Width - Slant) * t;
-        if (fillW > Slant + 1)
+        if (Bipolar)
+        {
+            // fill from the centre towards the value
+            var c = Slant + (r.Width - Slant) * 0.5;
+            var a = Math.Min(c, fillW);
+            var b = Math.Max(c, fillW);
+            if (b - a > 2)
+            {
+                var inner = new Rect(r.Left + a - Slant + 2, r.Top + 3, b - a + Slant - 2, r.Height - 6);
+                dc.DrawGeometry(P5.Red, null, P5.Slant(inner, Slant - 2));
+            }
+            dc.DrawLine(P5.Pen(P5.Grey, 2), new Point(r.Left + c, r.Top + 2),
+                new Point(r.Left + c - Slant, r.Bottom - 2));
+        }
+        else if (fillW > Slant + 1)
         {
             var inner = new Rect(r.Left + 3, r.Top + 3, Math.Max(fillW - 6, 1), r.Height - 6);
             dc.DrawGeometry(P5.Red, null, P5.Slant(inner, Slant - 2));

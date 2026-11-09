@@ -13,14 +13,14 @@
 
     <Window.Resources>
         <Style x:Key="Header" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="Impact, Arial Black" />
+            <Setter Property="FontFamily" Value="Arial Black" />
             <Setter Property="FontStyle" Value="Italic" />
-            <Setter Property="FontSize" Value="40" />
+            <Setter Property="FontSize" Value="34" />
             <Setter Property="Foreground" Value="#F5F5F5" />
             <Setter Property="Margin" Value="0,0,0,2" />
         </Style>
         <Style x:Key="SubHeader" TargetType="TextBlock">
-            <Setter Property="FontFamily" Value="Impact, Arial Black" />
+            <Setter Property="FontFamily" Value="Arial Black" />
             <Setter Property="FontStyle" Value="Italic" />
             <Setter Property="FontSize" Value="22" />
             <Setter Property="Foreground" Value="#E60012" />
@@ -115,7 +115,7 @@
                                            Hint="Выравнивает громкость: тихое громче, крик тише. 4–5 — норм" />
                             <c:SlashSlider x:Name="ToneS" Grid.Row="2" Grid.Column="2" Label="ТЕМБР"
                                            Minimum="-5" Maximum="5" Default="0" Step="0.5"
-                                           Hint="Влево — теплее, вправо — ярче и разборчивее" />
+                                           Bipolar="True" Hint="Влево — теплее, вправо — ярче и разборчивее" />
                         </Grid>
                     </StackPanel>
                 </Border>
