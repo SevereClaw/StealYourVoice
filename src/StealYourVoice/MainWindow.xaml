@@ -186,6 +186,9 @@
             </Grid>
 
             <DockPanel Grid.Row="3" Margin="4,12,0,0">
+                <c:SlashToggle x:Name="CheckUpdBtn" DockPanel.Dock="Right" Text="ОБНОВЛЕНИЯ" IsToggle="False"
+                               FontSize="12" Height="32" Tilt="-1" VerticalAlignment="Top"
+                               Hint="Проверить, вышла ли новая версия, и сразу скачать её" />
                 <TextBlock x:Name="VersionText" DockPanel.Dock="Right" Foreground="#9A9A9A" FontSize="12"
                            VerticalAlignment="Center" Margin="0,0,6,8" />
                 <WrapPanel>

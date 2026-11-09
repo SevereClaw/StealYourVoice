@@ -94,6 +94,11 @@ public partial class MainWindow : Window
 
         // bottom bar: hotkey / toast / autostart
         var cur = Updater.Current;
+        CheckUpdBtn.Click += async _ =>
+        {
+            if (_updater.Ready) { ApplyUpdate(); return; } // already downloaded — install right away
+            await CheckForUpdates(true);
+        };
         VersionText.Text = VersionLabel;
         VersionText.Cursor = Cursors.Hand;
         VersionText.ToolTip = "Нажми, чтобы проверить обновления";
@@ -129,6 +134,14 @@ public partial class MainWindow : Window
         _timer.Start();
 
         // window handle exists even when we start hidden in the tray
+        // older versions allowed bare typing keys (e.g. Enter) — those would hijack the key system-wide
+        if (_settings.HotkeyVk != 0 && !IsAllowedHotkey(KeyInterop.KeyFromVirtualKey(_settings.HotkeyVk), _settings.HotkeyMods))
+        {
+            _settings.HotkeyVk = 0x13; // Pause
+            _settings.HotkeyMods = 0;
+            _settings.Save();
+        }
+
         _hwnd = new WindowInteropHelper(this).EnsureHandle();
         HwndSource.FromHwnd(_hwnd)?.AddHook(WndProc);
         RegisterMuteHotkey();
@@ -458,7 +471,11 @@ public partial class MainWindow : Window
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (!_capturingHotkey) return;
+        if (!_capturingHotkey)
+        {
+            if ((e.Key == Key.Enter || e.Key == Key.Space) && e.OriginalSource is not TextBox) e.Handled = true;
+            return;
+        }
         e.Handled = true;
 
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
@@ -487,11 +504,31 @@ public partial class MainWindow : Window
         if (m.HasFlag(ModifierKeys.Shift)) mods |= 4;
         if (m.HasFlag(ModifierKeys.Windows)) mods |= 8;
 
+        if (!IsAllowedHotkey(key, mods))
+        {
+            // stay in capture mode and explain
+            HotkeyBtn.Text = $"{key.ToString().ToUpperInvariant()} НЕЛЬЗЯ БЕЗ CTRL/ALT/SHIFT — ДРУГУЮ?";
+            Audio.Sfx.Play("cancel");
+            return;
+        }
+
         _capturingHotkey = false;
         _settings.HotkeyVk = KeyInterop.VirtualKeyFromKey(key);
         _settings.HotkeyMods = mods;
         _settings.Save();
         RegisterMuteHotkey();
+    }
+
+    /// <summary>
+    /// A global hotkey swallows the key in every program. Bare keys are only allowed if nobody types with them
+    /// (F-keys, Pause, Scroll Lock, Insert, numpad extras); anything else needs a modifier.
+    /// </summary>
+    private static bool IsAllowedHotkey(Key key, int mods)
+    {
+        if (mods != 0) return key != Key.None;
+        if (key >= Key.F1 && key <= Key.F24) return true;
+        return key is Key.Pause or Key.Scroll or Key.Insert or Key.Multiply or Key.Divide or Key.Subtract
+            or Key.Add or Key.MediaPlayPause or Key.VolumeMute;
     }
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
