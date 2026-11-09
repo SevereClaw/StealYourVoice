@@ -94,8 +94,9 @@ public class RansomTitle : WrapPanel
             var b = new Border
             {
                 Background = bg,
-                BorderBrush = style == 1 ? P5.White : null,
-                BorderThickness = new Thickness(style == 1 ? 2 : 0),
+                // black letters get a white outline, red ones a black outline so they pop off the red backdrop
+                BorderBrush = style == 1 ? P5.White : style == 2 ? P5.Black : null,
+                BorderThickness = new Thickness(style == 0 ? 0 : 2.5),
                 Child = tb,
                 Margin = new Thickness(-2, rnd.Next(0, 9), -2, 0),
                 VerticalAlignment = VerticalAlignment.Top,

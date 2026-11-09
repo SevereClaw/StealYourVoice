@@ -153,7 +153,7 @@ public partial class MainWindow
             _vm.Script($"{S("Gain")}={VmClient.F(gain)};{S("Gate")}={VmClient.F(gate)};" +
                        $"{S("Comp")}={VmClient.F(comp)};{S("Mono")}={(mono ? 1 : 0)};");
             CloseTool();
-            StatusText.Text = "АВТОНАСТРОЙКА ПРИМЕНЕНА // ТВОЙ ГОЛОС ТЕПЕРЬ НАШ";
+            StatusText.Text = "АВТОНАСТРОЙКА ПРИМЕНЕНА";
         });
         AddToolButton("ЕЩЁ РАЗ", StartCalibration);
         AddToolButton("ОТМЕНА", CloseTool);

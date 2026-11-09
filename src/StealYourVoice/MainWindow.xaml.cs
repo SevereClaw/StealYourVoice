@@ -94,7 +94,14 @@ public partial class MainWindow : Window
 
         // bottom bar: hotkey / toast / autostart
         var cur = Updater.Current;
-        VersionText.Text = $"v{cur.Major}.{cur.Minor}.{Math.Max(cur.Build, 0)}";
+        VersionText.Text = VersionLabel;
+        VersionText.Cursor = Cursors.Hand;
+        VersionText.ToolTip = "Нажми, чтобы проверить обновления";
+        VersionText.MouseLeftButtonDown += async (_, e) =>
+        {
+            e.Handled = true; // don't start window drag
+            await CheckForUpdates(true);
+        };
         ToastT.IsChecked = _settings.ShowToast;
         ToastT.Click += t => { _settings.ShowToast = t.IsChecked; _settings.Save(); };
         AutostartT.IsChecked = IsAutostart();
@@ -112,8 +119,8 @@ public partial class MainWindow : Window
         _updateTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         _updateTimer.Tick += async (_, _) =>
         {
-            _updateTimer.Interval = TimeSpan.FromHours(6);
-            await CheckForUpdates();
+            _updateTimer.Interval = TimeSpan.FromMinutes(30);
+            await CheckForUpdates(false);
         };
         _updateTimer.Start();
 
@@ -606,10 +613,24 @@ public partial class MainWindow : Window
 
     // ───────────────────────── auto-update ─────────────────────────
 
-    private async System.Threading.Tasks.Task CheckForUpdates()
+    private static string VersionLabel
     {
-        if (_updating || _updater.Ready) return;
+        get { var c = Updater.Current; return $"v{c.Major}.{c.Minor}.{Math.Max(c.Build, 0)}"; }
+    }
+
+    private DateTime _lastUpdateCheck = DateTime.MinValue;
+
+    private async System.Threading.Tasks.Task CheckForUpdates(bool manual)
+    {
+        if (_updater.Ready)
+        {
+            if (manual) { UpdateBtn.Visibility = Visibility.Visible; Audio.Sfx.Play("confirm"); }
+            return;
+        }
+        if (_updating) return;
         _updating = true;
+        _lastUpdateCheck = DateTime.Now;
+        if (manual) VersionText.Text = $"{VersionLabel} • ПРОВЕРЯЮ...";
         try
         {
             var progress = new Progress<int>(p =>
@@ -632,6 +653,15 @@ public partial class MainWindow : Window
             else
             {
                 UpdateBtn.Visibility = Visibility.Collapsed;
+                if (manual)
+                {
+                    VersionText.Text = _updater.Latest == null
+                        ? $"{VersionLabel} • НЕ УДАЛОСЬ ПРОВЕРИТЬ (НЕТ СЕТИ?)"
+                        : $"{VersionLabel} • ЭТО ПОСЛЕДНЯЯ ВЕРСИЯ";
+                    var reset = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+                    reset.Tick += (_, _) => { reset.Stop(); VersionText.Text = VersionLabel; };
+                    reset.Start();
+                }
             }
         }
         finally
@@ -686,6 +716,7 @@ public partial class MainWindow : Window
             }
             catch { /* ignore */ }
         });
+        menu.Items.Add("Проверить обновления", null, async (_, _) => { ShowFromTray(); await CheckForUpdates(true); });
         menu.Items.Add("Перезагрузить звуки", null, (_, _) => { Audio.Sfx.Load(); Audio.Sfx.Play("confirm"); });
         menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
         menu.Items.Add("Выход", null, (_, _) => ExitApp());
@@ -741,6 +772,7 @@ public partial class MainWindow : Window
         WindowState = WindowState.Normal;
         Activate();
         if (wasHidden) PlayEntrance();
+        if ((DateTime.Now - _lastUpdateCheck).TotalMinutes > 2) _ = CheckForUpdates(false);
     }
 
     private void ExitApp()

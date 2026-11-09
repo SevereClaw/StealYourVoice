@@ -51,6 +51,7 @@ public sealed class Updater
     /// <summary>Checks for a newer release and downloads it. Returns true if an update is ready to apply.</summary>
     public async Task<bool> CheckAndDownloadAsync(IProgress<int>? progress = null)
     {
+        Latest = null;
         try
         {
             if (string.IsNullOrEmpty(ExePath) || !ExePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
