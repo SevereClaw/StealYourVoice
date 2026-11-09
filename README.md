@@ -30,4 +30,4 @@ Voicemeeter висит в трее и делает всю работу со зв
 dotnet publish src/StealYourVoice -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
 ```
 
-Нужен .NET 8 SDK. Релизы собирает GitHub Actions при пуше тега `v*`.
+Нужен .NET 8 SDK. Каждый пуш в `main` автоматически выпускает релиз для версии из `<Version>` в .csproj: чтобы выпустить новую, просто подними версию.
