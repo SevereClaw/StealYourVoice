@@ -1,0 +1,176 @@
+<Window x:Class="StealYourVoice.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="clr-namespace:StealYourVoice.Controls"
+        Title="Steal Your Voice"
+        Icon="Assets/app.ico"
+        Width="1040" Height="700"
+        WindowStyle="None" ResizeMode="CanMinimize"
+        WindowStartupLocation="CenterScreen"
+        Background="#0A0A0A"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display">
+
+    <Window.Resources>
+        <Style x:Key="Header" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Impact, Arial Black" />
+            <Setter Property="FontStyle" Value="Italic" />
+            <Setter Property="FontSize" Value="40" />
+            <Setter Property="Foreground" Value="#F5F5F5" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+        </Style>
+        <Style x:Key="SubHeader" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Impact, Arial Black" />
+            <Setter Property="FontStyle" Value="Italic" />
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="Foreground" Value="#E60012" />
+            <Setter Property="Margin" Value="0,10,0,6" />
+        </Style>
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background" Value="#EE0A0A0A" />
+            <Setter Property="BorderBrush" Value="#F5F5F5" />
+            <Setter Property="BorderThickness" Value="3" />
+            <Setter Property="Padding" Value="22,14,22,16" />
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <c:ShardBackground />
+
+        <Grid Margin="28,14,28,14">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Title bar -->
+            <DockPanel Grid.Row="0">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                    <c:SlashToggle x:Name="MinBtn" Text="—" IsToggle="False" Width="58" Hint="Свернуть в трей" />
+                    <c:SlashToggle x:Name="CloseBtn" Text="✕" IsToggle="False" Width="58" Hint="Выход" />
+                </StackPanel>
+                <c:RansomTitle Text="STEAL YOUR VOICE" Seed="7" LetterSize="34" HorizontalAlignment="Left" />
+            </DockPanel>
+
+            <!-- Status tag -->
+            <Border Grid.Row="1" HorizontalAlignment="Left" Background="#F5F5F5" Padding="14,3,18,3" Margin="6,12,0,10">
+                <Border.RenderTransform>
+                    <SkewTransform AngleX="-18" />
+                </Border.RenderTransform>
+                <TextBlock x:Name="StatusText" Text="ПОИСК VOICEMEETER..." FontFamily="Arial Black" FontSize="13" Foreground="#0A0A0A" />
+            </Border>
+
+            <!-- Main cards -->
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.35*" />
+                    <ColumnDefinition Width="26" />
+                    <ColumnDefinition Width="1*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- MIC CARD -->
+                <Border Grid.Column="0" Style="{StaticResource Card}">
+                    <Border.RenderTransform>
+                        <RotateTransform Angle="-1" />
+                    </Border.RenderTransform>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Header}" Text="МИКРОФОН" />
+
+                        <WrapPanel x:Name="StripPanel" Margin="0,4,0,0" />
+
+                        <c:SlashToggle x:Name="DeviceBtn" IsToggle="False" Text="УСТРОЙСТВО: —" FontSize="12"
+                                       HorizontalAlignment="Left" Hint="Выбрать, какое устройство сидит на этом входе" />
+
+                        <c:JaggedMeter x:Name="MicMeter" Margin="0,4,0,10" />
+
+                        <WrapPanel>
+                            <c:SlashToggle x:Name="MonoT" Text="MONO" Hint="Голос в оба канала (лечит «только левое ухо»)" />
+                            <c:SlashToggle x:Name="MuteT" Text="MUTE" Tilt="-2" Hint="Выключить микрофон" />
+                            <c:SlashToggle x:Name="A1T" Text="СЛЫШАТЬ СЕБЯ" Hint="Шина A1 — голос в наушники" />
+                            <c:SlashToggle x:Name="B1T" Text="В ЗАПИСЬ" Tilt="1.5" Hint="Шина B1 — голос уходит в ShadowPlay / Discord" />
+                        </WrapPanel>
+
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="24" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="12" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <c:SlashSlider x:Name="GainS" Grid.Row="0" Grid.Column="0" Label="ГРОМКОСТЬ"
+                                           Minimum="-60" Maximum="12" Default="0" Step="0.5" Unit=" dB"
+                                           Hint="Громкость микрофона. Двойной клик — 0 dB" />
+                            <c:SlashSlider x:Name="GateS" Grid.Row="0" Grid.Column="2" Label="ШУМОДАВ"
+                                           Minimum="0" Maximum="10" Default="0" Step="0.5"
+                                           Hint="Gate: глушит фон в паузах. Начни с 3–4" />
+                            <c:SlashSlider x:Name="CompS" Grid.Row="2" Grid.Column="0" Label="КОМПРЕССОР"
+                                           Minimum="0" Maximum="10" Default="0" Step="0.5"
+                                           Hint="Выравнивает громкость: тихое громче, крик тише. 4–5 — норм" />
+                            <c:SlashSlider x:Name="ToneS" Grid.Row="2" Grid.Column="2" Label="ТЕМБР"
+                                           Minimum="-5" Maximum="5" Default="0" Step="0.5"
+                                           Hint="Влево — теплее, вправо — ярче и разборчивее" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- OUTPUT CARD -->
+                <Border Grid.Column="2" Style="{StaticResource Card}">
+                    <Border.RenderTransform>
+                        <RotateTransform Angle="1" />
+                    </Border.RenderTransform>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Header}" Text="ЗАПИСЬ // B1" />
+                        <TextBlock Text="То, что слышат ShadowPlay и Discord" Foreground="#808080" FontSize="12" Margin="2,0,0,8" />
+
+                        <c:JaggedMeter x:Name="OutMeter" Margin="0,0,0,10" />
+                        <c:SlashSlider x:Name="OutGainS" Label="ГРОМКОСТЬ B1" Minimum="-60" Maximum="12" Default="0"
+                                       Step="0.5" Unit=" dB" Hint="Общая громкость того, что уходит в запись" />
+                        <WrapPanel Margin="0,10,0,0">
+                            <c:SlashToggle x:Name="OutMuteT" Text="MUTE B1" Hint="Заглушить весь выход в запись" />
+                        </WrapPanel>
+
+                        <TextBlock Style="{StaticResource SubHeader}" Text="ПРЕСЕТЫ" />
+                        <WrapPanel>
+                            <c:SlashToggle x:Name="PresetClean" Text="ЧИСТЫЙ" IsToggle="False" Tilt="-1.5"
+                                           Hint="Шумодав 3, компрессор 4, моно" />
+                            <c:SlashToggle x:Name="PresetStream" Text="СТРИМ" IsToggle="False" Tilt="1"
+                                           Hint="Шумодав 4.5, компрессор 6.5, моно — ровный голос поверх игры" />
+                            <c:SlashToggle x:Name="PresetRaw" Text="СЫРОЙ" IsToggle="False" Tilt="-0.5"
+                                           Hint="Без обработки" />
+                        </WrapPanel>
+
+                        <TextBlock Style="{StaticResource SubHeader}" Text="ДЕЙСТВИЯ" />
+                        <WrapPanel>
+                            <c:SlashToggle x:Name="ShowVmBtn" Text="ОТКРЫТЬ VOICEMEETER" IsToggle="False" FontSize="13" />
+                            <c:SlashToggle x:Name="RestartBtn" Text="ПЕРЕЗАПУСК ЗВУКА" IsToggle="False" FontSize="13"
+                                           Hint="Restart Audio Engine — если звук заикается или пропал" />
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <TextBlock Grid.Row="3" Margin="4,12,0,0" Foreground="#9A9A9A" FontSize="12"
+                       Text="Колёсико — точная настройка  •  Двойной клик по ползунку — сброс  •  «—» прячет в трей, Voicemeeter работает дальше" />
+        </Grid>
+
+        <!-- Offline overlay -->
+        <Grid x:Name="Offline" Background="#F00A0A0A" Visibility="Visible">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <c:RansomTitle Text="NO SIGNAL" Seed="3" LetterSize="48" HorizontalAlignment="Center" />
+                <TextBlock x:Name="OfflineText" Text="Ищу Voicemeeter..." Foreground="#F5F5F5" FontFamily="Arial Black"
+                           FontSize="16" HorizontalAlignment="Center" Margin="0,26,0,18" TextAlignment="Center" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <c:SlashToggle x:Name="LaunchBtn" Text="ЗАПУСТИТЬ VOICEMEETER" IsToggle="False" Height="44" FontSize="17" />
+                    <c:SlashToggle x:Name="OfflineCloseBtn" Text="ВЫХОД" IsToggle="False" Height="44" FontSize="17" />
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>
