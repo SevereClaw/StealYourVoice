@@ -16,6 +16,9 @@ public sealed class UserPreset
     public bool A1 { get; set; }
     public bool B1 { get; set; } = true;
     public float OutGain { get; set; } // Bus B1 gain
+
+    /// <summary>Process name (without .exe) that auto-applies this preset while it runs.</summary>
+    public string? Process { get; set; }
 }
 
 public sealed class Settings
@@ -37,6 +40,10 @@ public sealed class Settings
     public bool DuckAux { get; set; }           // "Voicemeeter AUX" virtual strip
     public double DuckAmount { get; set; } = -12;
     public double DuckThreshold { get; set; } = -40;
+    public bool DuckFriends { get; set; }       // duck the game while Discord (AUX) is talking
+
+    /// <summary>Corner mic indicator: 0 = off, 1..4 = TL, TR, BL, BR.</summary>
+    public int OverlayCorner { get; set; }
 
     public List<UserPreset> Presets { get; set; } = new();
 

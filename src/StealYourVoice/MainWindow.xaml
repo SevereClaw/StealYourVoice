@@ -4,7 +4,7 @@
         xmlns:c="clr-namespace:StealYourVoice.Controls"
         Title="Steal Your Voice"
         Icon="Assets/app.ico"
-        Width="1040" Height="810"
+        Width="1040" Height="860"
         WindowStyle="None" ResizeMode="CanMinimize"
         WindowStartupLocation="CenterScreen"
         Background="#0A0A0A"
@@ -130,6 +130,28 @@
                                            Minimum="-5" Maximum="5" Default="0" Step="0.5"
                                            Bipolar="True" Hint="Влево — теплее, вправо — ярче и разборчивее" />
                         </Grid>
+
+                        <StackPanel x:Name="DiscordPanel">
+                            <DockPanel Margin="0,12,0,6">
+                                <TextBlock x:Name="DiscordState" DockPanel.Dock="Right" Text="ТИШИНА" Foreground="#808080"
+                                           FontFamily="Arial Black" FontSize="12" VerticalAlignment="Bottom" Margin="0,0,4,3" />
+                                <TextBlock Style="{StaticResource SubHeader}" Text="DISCORD // AUX" Margin="0"
+                                           ToolTip="В Discord поставь устройство вывода «Voicemeeter AUX Input» — тогда голоса друзей идут отдельно от игры" />
+                            </DockPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="24" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <c:SlashSlider x:Name="AuxGainS" Grid.Column="0" Label="ГРОМКОСТЬ ДРУЗЕЙ"
+                                               Minimum="-60" Maximum="12" Default="0" Step="0.5" Unit=" dB"
+                                               Hint="Громкость Discord отдельно от игры. Работает, если в Discord устройство вывода — «Voicemeeter AUX Input»" />
+                                <c:SlashToggle x:Name="DuckFriendsT" Grid.Column="2" Text="ИГРА ТИШЕ ПОД ДРУЗЕЙ" FontSize="12" Height="32"
+                                               HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="0,0,0,4"
+                                               Hint="Когда говорят друзья в Discord, игра стихает (на столько же, сколько в «НА СКОЛЬКО»)" />
+                            </Grid>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 
@@ -151,7 +173,7 @@
 
                         <TextBlock Style="{StaticResource SubHeader}" Text="ПРЕСЕТЫ" />
                         <WrapPanel x:Name="PresetPanel" />
-                        <TextBlock Text="ПКМ по своему пресету — перезаписать / удалить" Foreground="#808080" FontSize="11" Margin="2,0,0,0" />
+                        <TextBlock Text="ПКМ по своему пресету — перезаписать / удалить / привязать к игре" Foreground="#808080" FontSize="11" Margin="2,0,0,0" />
 
                         <DockPanel Margin="0,10,0,6">
                             <TextBlock x:Name="DuckState" DockPanel.Dock="Right" Text="ВЫКЛЮЧЕНО" Foreground="#808080"
@@ -196,6 +218,8 @@
                                    Hint="Глобальная горячая клавиша вкл/выкл микрофона. Нажми и введи комбинацию. Backspace — убрать, Esc — отмена" />
                     <c:SlashToggle x:Name="ToastT" Text="ПЛАШКА MIC OFF" FontSize="12" Height="32" Tilt="1"
                                    Hint="Показывать «MIC OFF / MIC ON» поверх экрана при переключении" />
+                    <c:SlashToggle x:Name="OverlayBtn" IsToggle="False" Text="ИНДИКАТОР: ВЫКЛ" FontSize="12" Height="32" Tilt="-1"
+                                   Hint="Маленькая полоска уровня микрофона и значок MIC OFF в углу экрана поверх игры. Каждое нажатие — следующий угол" />
                     <c:SlashToggle x:Name="ShowVmBtn" Text="VOICEMEETER" IsToggle="False" FontSize="12" Height="32"
                                    Hint="Открыть окно Voicemeeter" />
                     <c:SlashToggle x:Name="RestartBtn" Text="РЕСТАРТ ЗВУКА" IsToggle="False" FontSize="12" Height="32" Tilt="-1"

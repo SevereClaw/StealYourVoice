@@ -81,6 +81,7 @@ public partial class MainWindow : Window
         InitTools();
         InitDucking();
         InitFx();
+        InitExtras();
 
         // presets
         BuildPresets();
@@ -173,6 +174,7 @@ public partial class MainWindow : Window
         }
 
         ToolTick();
+        ExtrasTick();
         DuckTick();
     }
 
@@ -219,6 +221,7 @@ public partial class MainWindow : Window
         if (head.Length > 40) head = head[..38] + "…";
         HeadBtn.Text = "НАУШНИКИ (A1): " + (string.IsNullOrWhiteSpace(head) ? "НЕ ВЫБРАНЫ ⚠" : head.ToUpperInvariant());
 
+        RefreshExtras();
         UpdateTrayMute();
     }
 
@@ -350,7 +353,7 @@ public partial class MainWindow : Window
         foreach (var p in _settings.Presets)
         {
             var preset = p;
-            var btn = AddPresetButton("★ " + preset.Name.ToUpperInvariant(),
+            var btn = AddPresetButton(PresetTitle(preset),
                 $"Громкость {preset.Gain:0.#} dB, шумодав {preset.Gate:0.#}, компрессор {preset.Comp:0.#}",
                 rnd.Next(-20, 21) / 10.0, () => ApplyUserPreset(preset));
 
@@ -359,6 +362,7 @@ public partial class MainWindow : Window
             overwrite.Click += (_, _) =>
             {
                 var fresh = CaptureCurrent(preset.Name);
+                fresh.Process = preset.Process;
                 var i = _settings.Presets.IndexOf(preset);
                 if (i >= 0) _settings.Presets[i] = fresh;
                 _settings.Save();
@@ -372,6 +376,7 @@ public partial class MainWindow : Window
                 BuildPresets();
             };
             menu.Items.Add(overwrite);
+            AddGameMenuItems(menu, preset, btn);
             menu.Items.Add(delete);
             btn.ContextMenu = menu;
         }
@@ -403,7 +408,7 @@ public partial class MainWindow : Window
         if (name.Length == 0) return;
         var existing = _settings.Presets.FindIndex(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
         var p = CaptureCurrent(name);
-        if (existing >= 0) _settings.Presets[existing] = p;
+        if (existing >= 0) { p.Process = _settings.Presets[existing].Process; _settings.Presets[existing] = p; }
         else _settings.Presets.Add(p);
         _settings.Save();
         SaveOverlay.Visibility = Visibility.Collapsed;
@@ -609,7 +614,8 @@ public partial class MainWindow : Window
     private void DuckTick()
     {
         if (_ducker == null) return;
-        if (!_vm.IsConnected || !_settings.DuckEnabled)
+        bool friendsOn = _settings.DuckFriends && _vm.Type != VmType.Standard;
+        if (!_vm.IsConnected || (!_settings.DuckEnabled && !friendsOn))
         {
             if (_ducker.Active) _ducker.Restore();
             DuckState.Text = "ВЫКЛЮЧЕНО";
@@ -619,13 +625,15 @@ public partial class MainWindow : Window
 
         var targets = new System.Collections.Generic.List<int>();
         int hw = _vm.HardwareStrips;
-        if (_settings.DuckMain) targets.Add(hw);
-        if (_settings.DuckAux && _vm.Type != VmType.Standard) targets.Add(hw + 1);
+        if (_settings.DuckMain || friendsOn) targets.Add(hw);
+        // friends can't duck themselves: with "under friends" on, AUX is never a target
+        if (_settings.DuckEnabled && _settings.DuckAux && !friendsOn && _vm.Type != VmType.Standard) targets.Add(hw + 1);
 
         // post-mute level: a muted mic never ducks the game
         var (l, r) = _vm.StripChannels(_strip, 2);
         var micDb = P5.ToDb(Math.Max(l, r));
-        _ducker.Tick(micDb, targets, _settings.DuckAmount, _settings.DuckThreshold);
+        bool voice = _settings.DuckEnabled && micDb > _settings.DuckThreshold;
+        _ducker.Tick(voice || (friendsOn && _friendsTalking), targets, _settings.DuckAmount);
 
         // is anything actually playing through the ducked inputs? (pre-fader, so ducking itself doesn't fool us)
         double gameDb = -90;
@@ -657,7 +665,8 @@ public partial class MainWindow : Window
         }
         else
         {
-            DuckState.Text = micDb > -90 ? $"ЖДУ ГОЛОС  ({micDb:0} / {_settings.DuckThreshold:0} dB)" : "ЖДУ ГОЛОС";
+            DuckState.Text = !_settings.DuckEnabled ? "ЖДУ ДРУЗЕЙ"
+                : micDb > -90 ? $"ЖДУ ГОЛОС  ({micDb:0} / {_settings.DuckThreshold:0} dB)" : "ЖДУ ГОЛОС";
             DuckState.Foreground = P5.White;
             DuckState.ToolTip = "Первое число — громкость микрофона сейчас, второе — порог. Говоришь, а число ниже порога? Опусти порог.";
         }
@@ -846,6 +855,7 @@ public partial class MainWindow : Window
         _ducker?.Restore();
         if (_hwnd != IntPtr.Zero) UnregisterHotKey(_hwnd, HotkeyId);
         _toast?.Close();
+        _overlay?.Close();
         if (_tray != null) { _tray.Visible = false; _tray.Dispose(); }
         _vm.Dispose();
         base.OnClosed(e);

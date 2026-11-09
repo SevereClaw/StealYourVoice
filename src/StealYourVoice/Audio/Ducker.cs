@@ -28,7 +28,7 @@ public sealed class Ducker
     /// <param name="targets">strip indexes to duck</param>
     /// <param name="amount">negative dB, e.g. -12</param>
     /// <param name="threshold">voice threshold in dB</param>
-    public void Tick(double micDb, IReadOnlyList<int> targets, double amount, double threshold)
+    public void Tick(bool voice, IReadOnlyList<int> targets, double amount)
     {
         if (!SameTargets(targets))
         {
@@ -39,7 +39,7 @@ public sealed class Ducker
         if (_targets.Count == 0) return;
 
         var now = DateTime.Now;
-        if (micDb > threshold) _lastVoice = now;
+        if (voice) _lastVoice = now;
         bool talking = (now - _lastVoice).TotalMilliseconds < HoldMs;
         double goal = talking ? Math.Min(0, amount) : 0;
 
