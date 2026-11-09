@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using StealYourVoice.Audio;
 using StealYourVoice.Controls;
+using StealYourVoice.Voicemeeter;
 
 namespace StealYourVoice;
 
