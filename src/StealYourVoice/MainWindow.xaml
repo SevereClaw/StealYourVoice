@@ -49,6 +49,8 @@
             <!-- Title bar -->
             <DockPanel Grid.Row="0">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                    <c:SlashToggle x:Name="UpdateBtn" Text="ОБНОВЛЕНИЕ" IsToggle="True" FontSize="13" Tilt="-2"
+                                   Visibility="Collapsed" Hint="Вышла новая версия — нажми, чтобы обновиться и перезапуститься" />
                     <c:SlashToggle x:Name="MinBtn" Text="—" IsToggle="False" Width="58" Hint="Свернуть в трей" />
                     <c:SlashToggle x:Name="CloseBtn" Text="✕" IsToggle="False" Width="58" Hint="Выход" />
                 </StackPanel>

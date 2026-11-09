@@ -21,6 +21,9 @@ public partial class MainWindow : Window
     private int _tick;
     private bool _exiting;
     private bool _balloonShown;
+    private readonly Updater _updater = new();
+    private readonly DispatcherTimer _updateTimer;
+    private bool _updating;
 
     private static readonly string SettingsDir =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StealYourVoice");
@@ -73,7 +76,17 @@ public partial class MainWindow : Window
 
         SetupTray();
 
-        _timer = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(33) };
+        // auto-update: first check shortly after start, then every 6 hours
+        UpdateBtn.Click += _ => ApplyUpdate();
+        _updateTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _updateTimer.Tick += async (_, _) =>
+        {
+            _updateTimer.Interval = TimeSpan.FromHours(6);
+            await CheckForUpdates();
+        };
+        _updateTimer.Start();
+
+        _timer =new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(33) };
         _timer.Tick += OnTick;
         _timer.Start();
     }
@@ -269,6 +282,62 @@ public partial class MainWindow : Window
         catch { /* ignore */ }
     }
 
+    // ───────────────────────── auto-update ─────────────────────────
+
+    private async System.Threading.Tasks.Task CheckForUpdates()
+    {
+        if (_updating || _updater.Ready) return;
+        _updating = true;
+        try
+        {
+            var progress = new Progress<int>(p =>
+            {
+                UpdateBtn.Visibility = Visibility.Visible;
+                UpdateBtn.IsChecked = false;
+                UpdateBtn.Text = $"КАЧАЮ ОБНОВЛЕНИЕ {p}%";
+            });
+
+            if (await _updater.CheckAndDownloadAsync(progress))
+            {
+                var v = _updater.Latest;
+                UpdateBtn.Text = $"ОБНОВИТЬ ДО v{v?.Major}.{v?.Minor}.{Math.Max(v?.Build ?? 0, 0)}";
+                UpdateBtn.IsChecked = true;
+                UpdateBtn.Visibility = Visibility.Visible;
+                if (!IsVisible)
+                    _tray?.ShowBalloonTip(3000, "Steal Your Voice", "Скачано обновление — открой окно и нажми «Обновить».",
+                        System.Windows.Forms.ToolTipIcon.Info);
+            }
+            else
+            {
+                UpdateBtn.Visibility = Visibility.Collapsed;
+            }
+        }
+        finally
+        {
+            _updating = false;
+        }
+    }
+
+    private void ApplyUpdate()
+    {
+        if (!_updater.Ready) { UpdateBtn.IsChecked = false; return; }
+        UpdateBtn.IsChecked = true;
+        UpdateBtn.Text = "ПЕРЕЗАПУСК...";
+        if (_updater.ApplyAndRestart())
+        {
+            ExitApp();
+            return;
+        }
+
+        UpdateBtn.Text = "НЕ ВЫШЛО — ОТКРОЙ РЕЛИЗ";
+        try
+        {
+            if (_updater.ReleaseUrl != null)
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_updater.ReleaseUrl) { UseShellExecute = true });
+        }
+        catch { /* ignore */ }
+    }
+
     // ───────────────────────── tray ─────────────────────────
 
     private void SetupTray()
@@ -292,7 +361,7 @@ public partial class MainWindow : Window
         _tray = new System.Windows.Forms.NotifyIcon
         {
             Icon = icon ?? System.Drawing.SystemIcons.Application,
-            Text = "Steal Your Voice",
+            Text = $"Steal Your Voice v{Updater.Current.Major}.{Updater.Current.Minor}.{Math.Max(Updater.Current.Build, 0)}",
             ContextMenuStrip = menu,
             Visible = true
         };
