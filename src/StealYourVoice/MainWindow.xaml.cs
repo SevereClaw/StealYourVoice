@@ -29,6 +29,7 @@ public partial class MainWindow : Window
     private readonly Settings _settings = Settings.Load();
     private MicToast? _toast;
     private Audio.Ducker? _ducker;
+    private DateTime _lastGameSound = DateTime.MinValue;
     private bool _capturingHotkey;
     private IntPtr _hwnd;
     private const int HotkeyId = 0x5359;
@@ -567,6 +568,16 @@ public partial class MainWindow : Window
         var micDb = P5.ToDb(Math.Max(l, r));
         _ducker.Tick(micDb, targets, _settings.DuckAmount, _settings.DuckThreshold);
 
+        // is anything actually playing through the ducked inputs? (pre-fader, so ducking itself doesn't fool us)
+        double gameDb = -90;
+        foreach (var t in targets)
+        {
+            var (gl, gr) = _vm.StripChannels(t, 0);
+            gameDb = Math.Max(gameDb, P5.ToDb(Math.Max(gl, gr)));
+        }
+        if (gameDb > -70) _lastGameSound = DateTime.Now;
+        bool noGame = (DateTime.Now - _lastGameSound).TotalSeconds > 3;
+
         if (targets.Count == 0)
         {
             DuckState.Text = "ВЫБЕРИ, ЧТО ПРИГЛУШАТЬ";
@@ -577,10 +588,19 @@ public partial class MainWindow : Window
             DuckState.Text = $"▼ ИГРА {_ducker.Offset:0} dB";
             DuckState.Foreground = P5.Red;
         }
+        else if (noGame)
+        {
+            DuckState.Text = "⚠ ЗВУК НЕ ИДЁТ ЧЕРЕЗ VOICEMEETER";
+            DuckState.Foreground = P5.Red;
+            DuckState.ToolTip = "На выбранных входах тишина: приглушать нечего. " +
+                                "Сделай «Voicemeeter Input» устройством воспроизведения по умолчанию в Windows " +
+                                "(или выбери его как выход в самой игре).";
+        }
         else
         {
-            DuckState.Text = "ЖДУ ГОЛОС";
+            DuckState.Text = micDb > -90 ? $"ЖДУ ГОЛОС  ({micDb:0} / {_settings.DuckThreshold:0} dB)" : "ЖДУ ГОЛОС";
             DuckState.Foreground = P5.White;
+            DuckState.ToolTip = "Первое число — громкость микрофона сейчас, второе — порог. Говоришь, а число ниже порога? Опусти порог.";
         }
     }
 
