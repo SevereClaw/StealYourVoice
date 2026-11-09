@@ -110,16 +110,23 @@ public class SlashSlider : FrameworkElement
         dc.DrawRectangle(Brushes.Transparent, null, new Rect(RenderSize)); // hit-test area
 
         // Label tag: white slanted plate with black text
-        var label = P5.Text(this, Label, P5.HeavyItalic, 13, P5.Black);
+        // Fit label tag + value into the width: shrink the value first, then the label
+        var valStr = _value.ToString("F" + Decimals) + Unit;
+        double valueSize = 22, labelSize = 13;
+        var label = P5.Text(this, Label, P5.HeavyItalic, labelSize, P5.Black);
+        var val = P5.Text(this, valStr, P5.Impact, valueSize, P5.White);
+        while (label.Width + 26 + val.Width + 12 > w && valueSize > 14)
+            val = P5.Text(this, valStr, P5.Impact, --valueSize, P5.White);
+        while (label.Width + 26 + val.Width + 12 > w && labelSize > 9)
+            label = P5.Text(this, Label, P5.HeavyItalic, --labelSize, P5.Black);
+
         var tag = new Rect(0, 2, label.Width + 26, 20);
         dc.DrawGeometry(_hover ? P5.Red : P5.White, null, P5.Slant(tag, 8));
         if (_hover) label.SetForegroundBrush(P5.White);
-        dc.DrawText(label, new Point(12, 3));
+        dc.DrawText(label, new Point(12, 2 + (20 - label.Height) / 2));
 
         // Value text on the right
-        var valStr = _value.ToString("F" + Decimals) + Unit;
-        var val = P5.Text(this, valStr, P5.Impact, 22, P5.White);
-        dc.DrawText(val, new Point(w - val.Width - 4, -2));
+        dc.DrawText(val, new Point(w - val.Width - 4, 25 - val.Height));
 
         // Bar
         var r = BarRect;
