@@ -4,7 +4,7 @@
         xmlns:c="clr-namespace:StealYourVoice.Controls"
         Title="Steal Your Voice"
         Icon="Assets/app.ico"
-        Width="1040" Height="700"
+        Width="1040" Height="760"
         WindowStyle="None" ResizeMode="CanMinimize"
         WindowStartupLocation="CenterScreen"
         Background="#0A0A0A"
@@ -142,14 +142,8 @@
                         </WrapPanel>
 
                         <TextBlock Style="{StaticResource SubHeader}" Text="ПРЕСЕТЫ" />
-                        <WrapPanel>
-                            <c:SlashToggle x:Name="PresetClean" Text="ЧИСТЫЙ" IsToggle="False" Tilt="-1.5"
-                                           Hint="Шумодав 3, компрессор 4, моно" />
-                            <c:SlashToggle x:Name="PresetStream" Text="СТРИМ" IsToggle="False" Tilt="1"
-                                           Hint="Шумодав 4.5, компрессор 6.5, моно — ровный голос поверх игры" />
-                            <c:SlashToggle x:Name="PresetRaw" Text="СЫРОЙ" IsToggle="False" Tilt="-0.5"
-                                           Hint="Без обработки" />
-                        </WrapPanel>
+                        <WrapPanel x:Name="PresetPanel" />
+                        <TextBlock Text="ПКМ по своему пресету — перезаписать / удалить" Foreground="#808080" FontSize="11" Margin="2,0,0,0" />
 
                         <TextBlock Style="{StaticResource SubHeader}" Text="ДЕЙСТВИЯ" />
                         <WrapPanel>
@@ -161,8 +155,39 @@
                 </Border>
             </Grid>
 
-            <TextBlock Grid.Row="3" Margin="4,12,0,0" Foreground="#9A9A9A" FontSize="12"
-                       Text="Колёсико — точная настройка  •  Двойной клик по ползунку — сброс  •  «—» прячет в трей, Voicemeeter работает дальше" />
+            <DockPanel Grid.Row="3" Margin="4,12,0,0">
+                <TextBlock x:Name="VersionText" DockPanel.Dock="Right" Foreground="#9A9A9A" FontSize="12"
+                           VerticalAlignment="Center" Margin="0,0,6,8" />
+                <WrapPanel>
+                    <c:SlashToggle x:Name="HotkeyBtn" IsToggle="False" Text="MUTE НА КЛАВИШЕ: PAUSE" FontSize="12" Height="32"
+                                   Hint="Глобальная горячая клавиша вкл/выкл микрофона. Нажми и введи комбинацию. Backspace — убрать, Esc — отмена" />
+                    <c:SlashToggle x:Name="ToastT" Text="ПЛАШКА MIC OFF" FontSize="12" Height="32" Tilt="1"
+                                   Hint="Показывать «MIC OFF / MIC ON» поверх экрана при переключении" />
+                    <c:SlashToggle x:Name="AutostartT" Text="АВТОЗАПУСК" FontSize="12" Height="32" Tilt="-1"
+                                   Hint="Запускаться вместе с Windows (сразу в трей)" />
+                </WrapPanel>
+            </DockPanel>
+        </Grid>
+
+        <!-- Save preset overlay -->
+        <Grid x:Name="SaveOverlay" Background="#E00A0A0A" Visibility="Collapsed">
+            <Border Background="#0A0A0A" BorderBrush="#F5F5F5" BorderThickness="3" Padding="28,20"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                <Border.RenderTransform>
+                    <RotateTransform Angle="-1.5" />
+                </Border.RenderTransform>
+                <StackPanel Width="420">
+                    <TextBlock Style="{StaticResource Header}" Text="НОВЫЙ ПРЕСЕТ" />
+                    <TextBlock Text="Сохранит текущие настройки микрофона и громкость B1" Foreground="#9A9A9A" FontSize="12" Margin="2,0,0,12" />
+                    <TextBox x:Name="PresetNameBox" MaxLength="16" FontFamily="Arial Black" FontSize="20"
+                             Background="#1A1A1A" Foreground="#F5F5F5" CaretBrush="#F5F5F5" SelectionBrush="#E60012"
+                             BorderBrush="#E60012" BorderThickness="3" Padding="10,6" Margin="0,0,0,16" />
+                    <StackPanel Orientation="Horizontal">
+                        <c:SlashToggle x:Name="SaveOk" Text="СОХРАНИТЬ" IsToggle="False" Height="40" FontSize="16" />
+                        <c:SlashToggle x:Name="SaveCancel" Text="ОТМЕНА" IsToggle="False" Height="40" FontSize="16" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
         </Grid>
 
         <!-- Offline overlay -->

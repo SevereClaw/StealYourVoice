@@ -1,0 +1,68 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
+
+namespace StealYourVoice;
+
+public sealed class UserPreset
+{
+    public string Name { get; set; } = "";
+    public float Gain { get; set; }
+    public float Gate { get; set; }
+    public float Comp { get; set; }
+    public float Tone { get; set; }   // Strip Color_x
+    public bool Mono { get; set; }
+    public bool A1 { get; set; }
+    public bool B1 { get; set; } = true;
+    public float OutGain { get; set; } // Bus B1 gain
+}
+
+public sealed class Settings
+{
+    public int Strip { get; set; }
+
+    /// <summary>Virtual-key code of the mute hotkey (0 = none). Default: Pause.</summary>
+    public int HotkeyVk { get; set; } = 0x13;
+
+    /// <summary>MOD_ALT=1, MOD_CONTROL=2, MOD_SHIFT=4, MOD_WIN=8.</summary>
+    public int HotkeyMods { get; set; }
+
+    public bool ShowToast { get; set; } = true;
+
+    public List<UserPreset> Presets { get; set; } = new();
+
+    private static readonly string Dir =
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StealYourVoice");
+    private static readonly string FilePath = Path.Combine(Dir, "settings.json");
+    private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
+
+    public static Settings Load()
+    {
+        try
+        {
+            if (File.Exists(FilePath))
+                return JsonSerializer.Deserialize<Settings>(File.ReadAllText(FilePath)) ?? new Settings();
+
+            // migrate from v0.1 strip.txt
+            var s = new Settings();
+            var old = Path.Combine(Dir, "strip.txt");
+            if (File.Exists(old) && int.TryParse(File.ReadAllText(old).Trim(), out var strip)) s.Strip = strip;
+            return s;
+        }
+        catch
+        {
+            return new Settings();
+        }
+    }
+
+    public void Save()
+    {
+        try
+        {
+            Directory.CreateDirectory(Dir);
+            File.WriteAllText(FilePath, JsonSerializer.Serialize(this, Json));
+        }
+        catch { /* ignore */ }
+    }
+}

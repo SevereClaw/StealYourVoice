@@ -1,10 +1,11 @@
 using System;
 using System.ComponentModel;
-using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using StealYourVoice.Controls;
 using StealYourVoice.Voicemeeter;
@@ -25,9 +26,18 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _updateTimer;
     private bool _updating;
 
-    private static readonly string SettingsDir =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StealYourVoice");
-    private static readonly string StripFile = Path.Combine(SettingsDir, "strip.txt");
+    private readonly Settings _settings = Settings.Load();
+    private MicToast? _toast;
+    private bool _capturingHotkey;
+    private IntPtr _hwnd;
+    private const int HotkeyId = 0x5359;
+    private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
     private string S(string p) => $"Strip[{_strip}].{p}";
     private string B1(string p) => $"Bus[{_vm.B1Index}].{p}";
@@ -35,7 +45,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        _strip = LoadStrip();
+        _strip = Math.Max(0, _settings.Strip);
 
         MouseLeftButtonDown += (_, e) => { if (e.ButtonState == MouseButtonState.Pressed) try { DragMove(); } catch { } };
 
@@ -67,9 +77,24 @@ public partial class MainWindow : Window
         OutMuteT.Click += t => _vm.Set(B1("Mute"), t.IsChecked ? 1 : 0);
 
         // presets
-        PresetClean.Click += _ => ApplyPreset(3, 4, true);
-        PresetStream.Click += _ => ApplyPreset(4.5f, 6.5f, true);
-        PresetRaw.Click += _ => ApplyPreset(0, 0, null);
+        BuildPresets();
+        SaveOk.Click += _ => SaveNewPreset();
+        SaveCancel.Click += _ => SaveOverlay.Visibility = Visibility.Collapsed;
+        PresetNameBox.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter) SaveNewPreset();
+            else if (e.Key == Key.Escape) SaveOverlay.Visibility = Visibility.Collapsed;
+        };
+
+        // bottom bar: hotkey / toast / autostart
+        var cur = Updater.Current;
+        VersionText.Text = $"v{cur.Major}.{cur.Minor}.{Math.Max(cur.Build, 0)}";
+        ToastT.IsChecked = _settings.ShowToast;
+        ToastT.Click += t => { _settings.ShowToast = t.IsChecked; _settings.Save(); };
+        AutostartT.IsChecked = IsAutostart();
+        AutostartT.Click += t => { SetAutostart(t.IsChecked); t.IsChecked = IsAutostart(); };
+        HotkeyBtn.Click += _ => StartHotkeyCapture();
+        PreviewKeyDown += OnPreviewKeyDown;
 
         ShowVmBtn.Click += _ => _vm.Script("Command.Show=1;");
         RestartBtn.Click += _ => _vm.Script("Command.Restart=1;");
@@ -89,6 +114,11 @@ public partial class MainWindow : Window
         _timer =new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(33) };
         _timer.Tick += OnTick;
         _timer.Start();
+
+        // window handle exists even when we start hidden in the tray
+        _hwnd = new WindowInteropHelper(this).EnsureHandle();
+        HwndSource.FromHwnd(_hwnd)?.AddHook(WndProc);
+        RegisterMuteHotkey();
     }
 
     // ───────────────────────── polling ─────────────────────────
@@ -263,22 +293,220 @@ public partial class MainWindow : Window
         menu.IsOpen = true;
     }
 
-    private void ApplyPreset(float gate, float comp, bool? mono)
-    {
-        var s = $"{S("Gate")}={VmClient.F(gate)};{S("Comp")}={VmClient.F(comp)};";
-        if (mono.HasValue) s += $"{S("Mono")}={(mono.Value ? 1 : 0)};";
-        _vm.Script(s);
-    }
-
-    private int LoadStrip()
-    {
-        try { return int.TryParse(File.ReadAllText(StripFile).Trim(), out var v) ? Math.Max(0, v) : 0; }
-        catch { return 0; }
-    }
-
     private void SaveStrip()
     {
-        try { Directory.CreateDirectory(SettingsDir); File.WriteAllText(StripFile, _strip.ToString()); }
+        _settings.Strip = _strip;
+        _settings.Save();
+    }
+
+    // ───────────────────────── presets ─────────────────────────
+
+    private void BuildPresets()
+    {
+        PresetPanel.Children.Clear();
+
+        AddPresetButton("ЧИСТЫЙ", "Шумодав 3, компрессор 4, моно", -1.5,
+            () => _vm.Script($"{S("Gate")}=3;{S("Comp")}=4;{S("Mono")}=1;"));
+        AddPresetButton("СТРИМ", "Шумодав 4.5, компрессор 6.5, моно — ровный голос поверх игры", 1,
+            () => _vm.Script($"{S("Gate")}=4.5;{S("Comp")}=6.5;{S("Mono")}=1;"));
+        AddPresetButton("СЫРОЙ", "Без обработки", -0.5,
+            () => _vm.Script($"{S("Gate")}=0;{S("Comp")}=0;"));
+
+        var rnd = new Random(42);
+        foreach (var p in _settings.Presets)
+        {
+            var preset = p;
+            var btn = AddPresetButton("★ " + preset.Name.ToUpperInvariant(),
+                $"Громкость {preset.Gain:0.#} dB, шумодав {preset.Gate:0.#}, компрессор {preset.Comp:0.#}",
+                rnd.Next(-20, 21) / 10.0, () => ApplyUserPreset(preset));
+
+            var menu = new ContextMenu();
+            var overwrite = new MenuItem { Header = "Перезаписать текущими настройками" };
+            overwrite.Click += (_, _) =>
+            {
+                var fresh = CaptureCurrent(preset.Name);
+                var i = _settings.Presets.IndexOf(preset);
+                if (i >= 0) _settings.Presets[i] = fresh;
+                _settings.Save();
+                BuildPresets();
+            };
+            var delete = new MenuItem { Header = "Удалить" };
+            delete.Click += (_, _) =>
+            {
+                _settings.Presets.Remove(preset);
+                _settings.Save();
+                BuildPresets();
+            };
+            menu.Items.Add(overwrite);
+            menu.Items.Add(delete);
+            btn.ContextMenu = menu;
+        }
+
+        var add = AddPresetButton("+ СВОЙ", "Сохранить текущие настройки как пресет", 2, OpenSaveOverlay);
+        add.IsToggle = false;
+    }
+
+    private SlashToggle AddPresetButton(string text, string hint, double tilt, Action onClick)
+    {
+        var b = new SlashToggle { Text = text, IsToggle = false, Tilt = tilt, Hint = hint, Height = 34, FontSize = 14 };
+        b.Click += _ => onClick();
+        PresetPanel.Children.Add(b);
+        return b;
+    }
+
+    private void OpenSaveOverlay()
+    {
+        if (!_vm.IsConnected) return;
+        PresetNameBox.Text = $"Пресет {_settings.Presets.Count + 1}";
+        SaveOverlay.Visibility = Visibility.Visible;
+        PresetNameBox.Focus();
+        PresetNameBox.SelectAll();
+    }
+
+    private void SaveNewPreset()
+    {
+        var name = PresetNameBox.Text.Trim();
+        if (name.Length == 0) return;
+        var existing = _settings.Presets.FindIndex(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
+        var p = CaptureCurrent(name);
+        if (existing >= 0) _settings.Presets[existing] = p;
+        else _settings.Presets.Add(p);
+        _settings.Save();
+        SaveOverlay.Visibility = Visibility.Collapsed;
+        BuildPresets();
+    }
+
+    private UserPreset CaptureCurrent(string name) => new()
+    {
+        Name = name,
+        Gain = _vm.Get(S("Gain")),
+        Gate = _vm.Get(S("Gate")),
+        Comp = _vm.Get(S("Comp")),
+        Tone = _vm.Get(S("Color_x")),
+        Mono = _vm.Get(S("Mono")) >= 0.5f,
+        A1 = _vm.Get(S("A1")) >= 0.5f,
+        B1 = _vm.Get(S("B1")) >= 0.5f,
+        OutGain = _vm.Get(B1("Gain")),
+    };
+
+    private void ApplyUserPreset(UserPreset p)
+    {
+        _vm.Script(
+            $"{S("Gain")}={VmClient.F(p.Gain)};" +
+            $"{S("Gate")}={VmClient.F(p.Gate)};" +
+            $"{S("Comp")}={VmClient.F(p.Comp)};" +
+            $"{S("Color_x")}={VmClient.F(p.Tone)};" +
+            $"{S("Mono")}={(p.Mono ? 1 : 0)};" +
+            $"{S("A1")}={(p.A1 ? 1 : 0)};" +
+            $"{S("B1")}={(p.B1 ? 1 : 0)};" +
+            $"{B1("Gain")}={VmClient.F(p.OutGain)};");
+    }
+
+    // ───────────────────────── mute hotkey ─────────────────────────
+
+    private void RegisterMuteHotkey()
+    {
+        if (_hwnd == IntPtr.Zero) return;
+        UnregisterHotKey(_hwnd, HotkeyId);
+        if (_settings.HotkeyVk == 0) { HotkeyBtn.Text = "MUTE НА КЛАВИШЕ: НЕТ"; return; }
+
+        bool ok = RegisterHotKey(_hwnd, HotkeyId, (uint)_settings.HotkeyMods | 0x4000 /* NOREPEAT */, (uint)_settings.HotkeyVk);
+        HotkeyBtn.Text = ok
+            ? $"MUTE НА КЛАВИШЕ: {HotkeyName()}"
+            : $"{HotkeyName()} ЗАНЯТА — ВЫБЕРИ ДРУГУЮ";
+    }
+
+    private string HotkeyName()
+    {
+        var parts = new System.Collections.Generic.List<string>();
+        if ((_settings.HotkeyMods & 2) != 0) parts.Add("CTRL");
+        if ((_settings.HotkeyMods & 1) != 0) parts.Add("ALT");
+        if ((_settings.HotkeyMods & 4) != 0) parts.Add("SHIFT");
+        if ((_settings.HotkeyMods & 8) != 0) parts.Add("WIN");
+        parts.Add(KeyInterop.KeyFromVirtualKey(_settings.HotkeyVk).ToString().ToUpperInvariant());
+        return string.Join("+", parts);
+    }
+
+    private void StartHotkeyCapture()
+    {
+        _capturingHotkey = true;
+        if (_hwnd != IntPtr.Zero) UnregisterHotKey(_hwnd, HotkeyId);
+        HotkeyBtn.Text = "НАЖМИ КЛАВИШУ...  (ESC — ОТМЕНА, BACKSPACE — УБРАТЬ)";
+        Activate();
+        Keyboard.Focus(this);
+    }
+
+    private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (!_capturingHotkey) return;
+        e.Handled = true;
+
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        switch (key)
+        {
+            case Key.LeftCtrl: case Key.RightCtrl: case Key.LeftAlt: case Key.RightAlt:
+            case Key.LeftShift: case Key.RightShift: case Key.LWin: case Key.RWin:
+                return; // wait for the real key
+            case Key.Escape:
+                _capturingHotkey = false;
+                RegisterMuteHotkey();
+                return;
+            case Key.Back:
+                _capturingHotkey = false;
+                _settings.HotkeyVk = 0;
+                _settings.HotkeyMods = 0;
+                _settings.Save();
+                RegisterMuteHotkey();
+                return;
+        }
+
+        int mods = 0;
+        var m = Keyboard.Modifiers;
+        if (m.HasFlag(ModifierKeys.Alt)) mods |= 1;
+        if (m.HasFlag(ModifierKeys.Control)) mods |= 2;
+        if (m.HasFlag(ModifierKeys.Shift)) mods |= 4;
+        if (m.HasFlag(ModifierKeys.Windows)) mods |= 8;
+
+        _capturingHotkey = false;
+        _settings.HotkeyVk = KeyInterop.VirtualKeyFromKey(key);
+        _settings.HotkeyMods = mods;
+        _settings.Save();
+        RegisterMuteHotkey();
+    }
+
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        const int WM_HOTKEY = 0x0312;
+        if (msg == WM_HOTKEY && wParam.ToInt32() == HotkeyId)
+        {
+            ToggleMute();
+            handled = true;
+        }
+        return IntPtr.Zero;
+    }
+
+    // ───────────────────────── autostart ─────────────────────────
+
+    private static bool IsAutostart()
+    {
+        try
+        {
+            using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunKey);
+            return k?.GetValue("StealYourVoice") != null;
+        }
+        catch { return false; }
+    }
+
+    private static void SetAutostart(bool on)
+    {
+        try
+        {
+            using var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(RunKey);
+            if (on && Environment.ProcessPath != null)
+                k.SetValue("StealYourVoice", $"\"{Environment.ProcessPath}\" --tray");
+            else
+                k.DeleteValue("StealYourVoice", false);
+        }
         catch { /* ignore */ }
     }
 
@@ -378,6 +606,11 @@ public partial class MainWindow : Window
         _vm.Set(S("Mute"), muted ? 0 : 1);
         MuteT.IsChecked = !muted;
         UpdateTrayMute();
+        if (_settings.ShowToast)
+        {
+            _toast ??= new MicToast();
+            _toast.Flash(!muted);
+        }
     }
 
     private void UpdateTrayMute()
@@ -418,6 +651,8 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _timer.Stop();
+        if (_hwnd != IntPtr.Zero) UnregisterHotKey(_hwnd, HotkeyId);
+        _toast?.Close();
         if (_tray != null) { _tray.Visible = false; _tray.Dispose(); }
         _vm.Dispose();
         base.OnClosed(e);
