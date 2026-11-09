@@ -83,6 +83,9 @@
 
                         <c:SlashToggle x:Name="DeviceBtn" IsToggle="False" Text="УСТРОЙСТВО: —" FontSize="12"
                                        HorizontalAlignment="Left" Hint="Выбрать, какое устройство сидит на этом входе" />
+                        <c:SlashToggle x:Name="HeadBtn" IsToggle="False" Text="НАУШНИКИ (A1): —" FontSize="12"
+                                       HorizontalAlignment="Left" Tilt="-0.7"
+                                       Hint="Куда Voicemeeter выводит звук шины A1 — сюда приходит «слышать себя»" />
 
                         <c:JaggedMeter x:Name="MicMeter" Margin="0,4,0,10" />
 

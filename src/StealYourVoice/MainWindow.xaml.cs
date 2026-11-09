@@ -48,7 +48,14 @@ public partial class MainWindow : Window
         ToneS.ValueChanged += v => _vm.Set(S("Color_x"), (float)(v / 10.0));
         MonoT.Click += t => _vm.Set(S("Mono"), t.IsChecked ? 1 : 0);
         MuteT.Click += t => { _vm.Set(S("Mute"), t.IsChecked ? 1 : 0); UpdateTrayMute(); };
-        A1T.Click += t => _vm.Set(S("A1"), t.IsChecked ? 1 : 0);
+        A1T.Click += t =>
+        {
+            _vm.Set(S("A1"), t.IsChecked ? 1 : 0);
+            // A1 without a hardware device = silence. Ask where the headphones are.
+            if (t.IsChecked && string.IsNullOrWhiteSpace(_vm.GetString("Bus[0].device.name")))
+                ShowHeadphonesMenu("Выбери наушники — без них A1 молчит");
+        };
+        HeadBtn.Click += _ => ShowHeadphonesMenu(null);
         B1T.Click += t => _vm.Set(S("B1"), t.IsChecked ? 1 : 0);
         DeviceBtn.Click += _ => ShowDeviceMenu();
 
@@ -133,6 +140,10 @@ public partial class MainWindow : Window
         if (dev.Length > 42) dev = dev[..40] + "…";
         DeviceBtn.Text = "УСТРОЙСТВО: " + (string.IsNullOrWhiteSpace(dev) ? "НЕ ВЫБРАНО" : dev.ToUpperInvariant());
 
+        var head = _vm.GetString("Bus[0].device.name");
+        if (head.Length > 40) head = head[..38] + "…";
+        HeadBtn.Text = "НАУШНИКИ (A1): " + (string.IsNullOrWhiteSpace(head) ? "НЕ ВЫБРАНЫ ⚠" : head.ToUpperInvariant());
+
         UpdateTrayMute();
     }
 
@@ -205,6 +216,37 @@ public partial class MainWindow : Window
         menu.Items.Add(new Separator());
         var hint = new MenuItem { Header = "WDM — лучший вариант для микрофона", IsEnabled = false };
         menu.Items.Add(hint);
+        menu.IsOpen = true;
+    }
+
+    private void ShowHeadphonesMenu(string? title)
+    {
+        var menu = new ContextMenu { PlacementTarget = HeadBtn, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
+        if (title != null)
+        {
+            menu.Items.Add(new MenuItem { Header = title, IsEnabled = false });
+            menu.Items.Add(new Separator());
+        }
+
+        var devices = _vm.OutputDevices()
+            .Where(d => !d.Name.Contains("Voicemeeter", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(d => d.Kind == "wdm" ? 0 : d.Kind == "mme" ? 1 : 2)
+            .ThenBy(d => d.Name)
+            .ToList();
+
+        if (devices.Count == 0)
+            menu.Items.Add(new MenuItem { Header = "Устройства не найдены", IsEnabled = false });
+
+        foreach (var d in devices)
+        {
+            var dev = d;
+            var mi = new MenuItem { Header = dev.ToString() };
+            mi.Click += (_, _) => _vm.SetBusDevice(0, dev);
+            menu.Items.Add(mi);
+        }
+
+        menu.Items.Add(new Separator());
+        menu.Items.Add(new MenuItem { Header = "WDM — меньше задержка. Если трещит — бери MME", IsEnabled = false });
         menu.IsOpen = true;
     }
 

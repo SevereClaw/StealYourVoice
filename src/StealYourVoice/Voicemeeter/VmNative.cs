@@ -107,4 +107,10 @@ internal static class VmNative
 
     [DllImport(Dll, EntryPoint = "VBVMR_Input_GetDeviceDescA", CallingConvention = CallingConvention.StdCall, CharSet = CharSet.Ansi)]
     public static extern int InputGetDeviceDescA(int index, out int type, StringBuilder name, StringBuilder hardwareId);
+
+    [DllImport(Dll, EntryPoint = "VBVMR_Output_GetDeviceNumber", CallingConvention = CallingConvention.StdCall)]
+    public static extern int OutputGetDeviceNumber();
+
+    [DllImport(Dll, EntryPoint = "VBVMR_Output_GetDeviceDescA", CallingConvention = CallingConvention.StdCall, CharSet = CharSet.Ansi)]
+    public static extern int OutputGetDeviceDescA(int index, out int type, StringBuilder name, StringBuilder hardwareId);
 }

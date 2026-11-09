@@ -147,18 +147,25 @@ public sealed class VmClient : IDisposable
         return peak;
     }
 
-    public List<VmDevice> InputDevices()
+    public List<VmDevice> InputDevices() => Devices(false);
+    public List<VmDevice> OutputDevices() => Devices(true);
+
+    private List<VmDevice> Devices(bool output)
     {
         var list = new List<VmDevice>();
         if (!IsConnected) return list;
         try
         {
-            int n = VmNative.InputGetDeviceNumber();
+            int n = output ? VmNative.OutputGetDeviceNumber() : VmNative.InputGetDeviceNumber();
             for (int i = 0; i < n; i++)
             {
                 var name = new StringBuilder(512);
                 var hw = new StringBuilder(512);
-                if (VmNative.InputGetDeviceDescA(i, out var t, name, hw) != 0) continue;
+                int t;
+                int r = output
+                    ? VmNative.OutputGetDeviceDescA(i, out t, name, hw)
+                    : VmNative.InputGetDeviceDescA(i, out t, name, hw);
+                if (r != 0) continue;
                 var kind = t switch { 1 => "mme", 3 => "wdm", 4 => "ks", 5 => "asio", _ => "" };
                 if (kind == "" || kind == "asio") continue;
                 list.Add(new VmDevice(kind, name.ToString()));
@@ -170,6 +177,9 @@ public sealed class VmClient : IDisposable
 
     public void SetStripDevice(int strip, VmDevice d) =>
         Script($"Strip[{strip}].device.{d.Kind}=\"{d.Name.Replace("\"", "")}\";");
+
+    public void SetBusDevice(int bus, VmDevice d) =>
+        Script($"Bus[{bus}].device.{d.Kind}=\"{d.Name.Replace("\"", "")}\";");
 
     public void Dispose()
     {
