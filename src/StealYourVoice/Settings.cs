@@ -30,6 +30,13 @@ public sealed class Settings
 
     public bool ShowToast { get; set; } = true;
 
+    // auto-ducking
+    public bool DuckEnabled { get; set; }
+    public bool DuckMain { get; set; } = true;  // "Voicemeeter Input" virtual strip
+    public bool DuckAux { get; set; }           // "Voicemeeter AUX" virtual strip
+    public double DuckAmount { get; set; } = -12;
+    public double DuckThreshold { get; set; } = -40;
+
     public List<UserPreset> Presets { get; set; } = new();
 
     private static readonly string Dir =

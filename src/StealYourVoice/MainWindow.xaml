@@ -4,7 +4,7 @@
         xmlns:c="clr-namespace:StealYourVoice.Controls"
         Title="Steal Your Voice"
         Icon="Assets/app.ico"
-        Width="1040" Height="760"
+        Width="1040" Height="810"
         WindowStyle="None" ResizeMode="CanMinimize"
         WindowStartupLocation="CenterScreen"
         Background="#0A0A0A"
@@ -153,12 +153,34 @@
                         <WrapPanel x:Name="PresetPanel" />
                         <TextBlock Text="ПКМ по своему пресету — перезаписать / удалить" Foreground="#808080" FontSize="11" Margin="2,0,0,0" />
 
-                        <TextBlock Style="{StaticResource SubHeader}" Text="ДЕЙСТВИЯ" />
+                        <DockPanel Margin="0,10,0,6">
+                            <TextBlock x:Name="DuckState" DockPanel.Dock="Right" Text="ВЫКЛЮЧЕНО" Foreground="#808080"
+                                       FontFamily="Arial Black" FontSize="12" VerticalAlignment="Bottom" Margin="0,0,4,3" />
+                            <TextBlock Style="{StaticResource SubHeader}" Text="АВТОПРИГЛУШЕНИЕ" Margin="0" />
+                        </DockPanel>
                         <WrapPanel>
-                            <c:SlashToggle x:Name="ShowVmBtn" Text="ОТКРЫТЬ VOICEMEETER" IsToggle="False" FontSize="13" />
-                            <c:SlashToggle x:Name="RestartBtn" Text="ПЕРЕЗАПУСК ЗВУКА" IsToggle="False" FontSize="13"
-                                           Hint="Restart Audio Engine — если звук заикается или пропал" />
+                            <c:SlashToggle x:Name="DuckT" Text="ВКЛ" FontSize="13" Height="32" Tilt="-1"
+                                           Hint="Когда говоришь, игра/музыка в Voicemeeter стихает. Звук игры должен идти в Voicemeeter Input" />
+                            <c:SlashToggle x:Name="DuckMainT" Text="VM INPUT" FontSize="13" Height="32"
+                                           Hint="Приглушать виртуальный вход «Voicemeeter Input» (обычно туда идёт весь звук Windows / игра)" />
+                            <c:SlashToggle x:Name="DuckAuxT" Text="AUX" FontSize="13" Height="32" Tilt="1"
+                                           Hint="Приглушать виртуальный вход «Voicemeeter AUX» (например, музыка или Discord)" />
+                            <c:SlashToggle x:Name="GameToB1T" Text="ИГРУ В ЗАПИСЬ" FontSize="13" Height="32"
+                                           Hint="Отправлять Voicemeeter Input ещё и в B1 — тогда в клипе ShadowPlay будет игра уже с приглушением. В ShadowPlay поставь «Системные звуки» на 0%" />
                         </WrapPanel>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="18" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <c:SlashSlider x:Name="DuckAmountS" Grid.Column="0" Label="НА СКОЛЬКО" Minimum="-30" Maximum="-2"
+                                           Default="-12" Step="1" Unit=" dB" Decimals="0"
+                                           Hint="Насколько тише становится игра, пока ты говоришь" />
+                            <c:SlashSlider x:Name="DuckThreshS" Grid.Column="2" Label="ПОРОГ ГОЛОСА" Minimum="-60" Maximum="-15"
+                                           Default="-40" Step="1" Unit=" dB" Decimals="0"
+                                           Hint="Громкость микрофона, с которой считается, что ты говоришь. Срабатывает от шума — подними; не срабатывает — опусти" />
+                        </Grid>
                     </StackPanel>
                 </Border>
             </Grid>
@@ -171,6 +193,10 @@
                                    Hint="Глобальная горячая клавиша вкл/выкл микрофона. Нажми и введи комбинацию. Backspace — убрать, Esc — отмена" />
                     <c:SlashToggle x:Name="ToastT" Text="ПЛАШКА MIC OFF" FontSize="12" Height="32" Tilt="1"
                                    Hint="Показывать «MIC OFF / MIC ON» поверх экрана при переключении" />
+                    <c:SlashToggle x:Name="ShowVmBtn" Text="VOICEMEETER" IsToggle="False" FontSize="12" Height="32"
+                                   Hint="Открыть окно Voicemeeter" />
+                    <c:SlashToggle x:Name="RestartBtn" Text="РЕСТАРТ ЗВУКА" IsToggle="False" FontSize="12" Height="32" Tilt="-1"
+                                   Hint="Restart Audio Engine — если звук заикается или пропал" />
                     <c:SlashToggle x:Name="AutostartT" Text="АВТОЗАПУСК" FontSize="12" Height="32" Tilt="-1"
                                    Hint="Запускаться вместе с Windows (сразу в трей)" />
                 </WrapPanel>

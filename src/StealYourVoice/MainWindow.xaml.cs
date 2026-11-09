@@ -28,6 +28,7 @@ public partial class MainWindow : Window
 
     private readonly Settings _settings = Settings.Load();
     private MicToast? _toast;
+    private Audio.Ducker? _ducker;
     private bool _capturingHotkey;
     private IntPtr _hwnd;
     private const int HotkeyId = 0x5359;
@@ -77,6 +78,7 @@ public partial class MainWindow : Window
         OutMuteT.Click += t => _vm.Set(B1("Mute"), t.IsChecked ? 1 : 0);
 
         InitTools();
+        InitDucking();
 
         // presets
         BuildPresets();
@@ -149,6 +151,7 @@ public partial class MainWindow : Window
         }
 
         ToolTick();
+        DuckTick();
     }
 
     private void OnConnected()
@@ -182,6 +185,8 @@ public partial class MainWindow : Window
 
         SetSlider(OutGainS, _vm.Get(B1("Gain")));
         OutMuteT.IsChecked = _vm.Get(B1("Mute")) >= 0.5f;
+        GameToB1T.IsChecked = _vm.Get($"Strip[{_vm.HardwareStrips}].B1") >= 0.5f;
+        DuckAuxT.Visibility = _vm.Type == VmType.Standard ? Visibility.Collapsed : Visibility.Visible;
 
         var dev = _vm.GetString(S("device.name"));
         if (dev.Length > 42) dev = dev[..40] + "…";
@@ -514,6 +519,68 @@ public partial class MainWindow : Window
         catch { /* ignore */ }
     }
 
+    // ───────────────────────── auto-ducking ─────────────────────────
+
+    private void InitDucking()
+    {
+        _ducker = new Audio.Ducker(_vm);
+        DuckT.IsChecked = _settings.DuckEnabled;
+        DuckMainT.IsChecked = _settings.DuckMain;
+        DuckAuxT.IsChecked = _settings.DuckAux;
+        DuckAmountS.Value = _settings.DuckAmount;
+        DuckThreshS.Value = _settings.DuckThreshold;
+
+        DuckT.Click += t =>
+        {
+            _settings.DuckEnabled = t.IsChecked;
+            _settings.Save();
+            if (!t.IsChecked) _ducker.Restore();
+        };
+        DuckMainT.Click += t => { _settings.DuckMain = t.IsChecked; _settings.Save(); };
+        DuckAuxT.Click += t => { _settings.DuckAux = t.IsChecked; _settings.Save(); };
+        DuckAmountS.ValueChanged += v => { _settings.DuckAmount = v; _settings.Save(); };
+        DuckThreshS.ValueChanged += v => { _settings.DuckThreshold = v; _settings.Save(); };
+        GameToB1T.Click += t => _vm.Set($"Strip[{_vm.HardwareStrips}].B1", t.IsChecked ? 1 : 0);
+    }
+
+    private void DuckTick()
+    {
+        if (_ducker == null) return;
+        if (!_vm.IsConnected || !_settings.DuckEnabled)
+        {
+            if (_ducker.Active) _ducker.Restore();
+            DuckState.Text = "ВЫКЛЮЧЕНО";
+            DuckState.Foreground = P5.Grey;
+            return;
+        }
+
+        var targets = new System.Collections.Generic.List<int>();
+        int hw = _vm.HardwareStrips;
+        if (_settings.DuckMain) targets.Add(hw);
+        if (_settings.DuckAux && _vm.Type != VmType.Standard) targets.Add(hw + 1);
+
+        // post-mute level: a muted mic never ducks the game
+        var (l, r) = _vm.StripChannels(_strip, 2);
+        var micDb = P5.ToDb(Math.Max(l, r));
+        _ducker.Tick(micDb, targets, _settings.DuckAmount, _settings.DuckThreshold);
+
+        if (targets.Count == 0)
+        {
+            DuckState.Text = "ВЫБЕРИ, ЧТО ПРИГЛУШАТЬ";
+            DuckState.Foreground = P5.Grey;
+        }
+        else if (_ducker.Active)
+        {
+            DuckState.Text = $"▼ ИГРА {_ducker.Offset:0} dB";
+            DuckState.Foreground = P5.Red;
+        }
+        else
+        {
+            DuckState.Text = "ЖДУ ГОЛОС";
+            DuckState.Foreground = P5.White;
+        }
+    }
+
     // ───────────────────────── auto-update ─────────────────────────
 
     private async System.Threading.Tasks.Task CheckForUpdates()
@@ -655,6 +722,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _timer.Stop();
+        _ducker?.Restore();
         if (_hwnd != IntPtr.Zero) UnregisterHotKey(_hwnd, HotkeyId);
         _toast?.Close();
         if (_tray != null) { _tray.Visible = false; _tray.Dispose(); }
