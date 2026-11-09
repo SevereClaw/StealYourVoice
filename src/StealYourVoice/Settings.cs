@@ -29,6 +29,7 @@ public sealed class Settings
     public int HotkeyMods { get; set; }
 
     public bool ShowToast { get; set; } = true;
+    public bool SoundsEnabled { get; set; } = true;
 
     // auto-ducking
     public bool DuckEnabled { get; set; }

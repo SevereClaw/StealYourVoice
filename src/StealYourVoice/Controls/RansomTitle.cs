@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 
 namespace StealYourVoice.Controls;
 
@@ -26,6 +27,41 @@ public class RansomTitle : WrapPanel
         Orientation = Orientation.Horizontal;
         IsHitTestVisible = false;
         Loaded += (_, _) => Build();
+    }
+
+    /// <summary>Letters pop in one by one, like cut-outs slapped onto the card.</summary>
+    public void AnimateIn()
+    {
+        int i = 0;
+        foreach (UIElement child in Children)
+        {
+            if (child is not Border b || b.RenderTransform is not TransformGroup g || g.Children.Count < 2) continue;
+            if (g.Children[0] is not ScaleTransform sc || g.Children[1] is not RotateTransform rot) continue;
+
+            var begin = TimeSpan.FromMilliseconds(i * 32);
+            var pop = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(260))
+            {
+                BeginTime = begin,
+                EasingFunction = new System.Windows.Media.Animation.BackEase
+                    { Amplitude = 0.8, EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut },
+                FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop
+            };
+            sc.ScaleX = 0; sc.ScaleY = 0;
+            pop.Completed += (_, _) => { sc.ScaleX = 1; sc.ScaleY = 1; };
+            sc.BeginAnimation(ScaleTransform.ScaleXProperty, pop);
+            sc.BeginAnimation(ScaleTransform.ScaleYProperty, pop);
+
+            var angle = rot.Angle;
+            var spin = new DoubleAnimation(angle - 40, angle, TimeSpan.FromMilliseconds(260))
+            {
+                BeginTime = begin,
+                EasingFunction = new System.Windows.Media.Animation.CubicEase
+                    { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut },
+                FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop
+            };
+            rot.BeginAnimation(RotateTransform.AngleProperty, spin);
+            i++;
+        }
     }
 
     private void Build()
@@ -64,7 +100,10 @@ public class RansomTitle : WrapPanel
                 Margin = new Thickness(-2, rnd.Next(0, 9), -2, 0),
                 VerticalAlignment = VerticalAlignment.Top,
                 RenderTransformOrigin = new Point(0.5, 0.5),
-                RenderTransform = new RotateTransform(rnd.Next(-12, 13)),
+                RenderTransform = new TransformGroup
+                {
+                    Children = { new ScaleTransform(1, 1), new RotateTransform(rnd.Next(-12, 13)) }
+                },
             };
             Panel.SetZIndex(b, rnd.Next(10));
             Children.Add(b);

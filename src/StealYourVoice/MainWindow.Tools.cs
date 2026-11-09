@@ -76,7 +76,7 @@ public partial class MainWindow
         ToolButtons.Children.Clear();
         ToolMeter.Visibility = Visibility.Visible;
         AddToolButton("ОТМЕНА", CloseTool);
-        ToolOverlay.Visibility = Visibility.Visible;
+        if (ToolOverlay.Visibility != Visibility.Visible) ShowOverlay(ToolOverlay);
     }
 
     private void CloseTool()
@@ -356,7 +356,8 @@ public partial class MainWindow
 
     private void AddToolButton(string text, Action onClick)
     {
-        var b = new SlashToggle { Text = text, IsToggle = false, Height = 40, FontSize = 15 };
+        var sound = text is "ОТМЕНА" or "ЗАКРЫТЬ" ? "cancel" : text == "ПРИМЕНИТЬ" ? "confirm" : "click";
+        var b = new SlashToggle { Text = text, IsToggle = false, Height = 40, FontSize = 15, Sound = sound };
         b.Click += _ => onClick();
         ToolButtons.Children.Add(b);
     }

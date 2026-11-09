@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using StealYourVoice.Audio;
 
 namespace StealYourVoice.Controls;
 
@@ -54,7 +55,11 @@ public class SlashSlider : FrameworkElement
     {
         var old = _value;
         Value = v;
-        if (Math.Abs(old - _value) > 0.0001) ValueChanged?.Invoke(_value);
+        if (Math.Abs(old - _value) > 0.0001)
+        {
+            Sfx.Play("hover"); // ratchet tick (rate-limited)
+            ValueChanged?.Invoke(_value);
+        }
     }
 
     private Rect BarRect => new(0, BarTop, Math.Max(ActualWidth, 1), Math.Max(ActualHeight - BarTop - 4, 8));

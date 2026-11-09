@@ -2,6 +2,8 @@ using System;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using StealYourVoice.Audio;
 
 namespace StealYourVoice.Controls;
 
@@ -30,6 +32,12 @@ public class SlashToggle : FrameworkElement
         set { if (_checked == value) return; _checked = value; InvalidateVisual(); }
     }
 
+    /// <summary>Sound on click for plain buttons: click / confirm / cancel / whoosh, or "" for none.</summary>
+    public string Sound { get; set; } = "click";
+
+    private readonly ScaleTransform _scale = new(1, 1);
+    private readonly RotateTransform _rotate = new(0);
+
     public event Action<SlashToggle>? Click;
 
     public SlashToggle()
@@ -40,7 +48,8 @@ public class SlashToggle : FrameworkElement
         Loaded += (_, _) =>
         {
             if (!string.IsNullOrEmpty(Hint)) ToolTip = Hint;
-            if (Math.Abs(Tilt) > 0.01) RenderTransform = new RotateTransform(Tilt);
+            _rotate.Angle = Tilt;
+            RenderTransform = new TransformGroup { Children = { _scale, _rotate } };
             RenderTransformOrigin = new Point(0.5, 0.5);
         };
     }
@@ -56,6 +65,7 @@ public class SlashToggle : FrameworkElement
     {
         _pressed = true;
         CaptureMouse();
+        AnimateScale(0.9, 60, null);
         InvalidateVisual();
         e.Handled = true;
     }
@@ -65,18 +75,43 @@ public class SlashToggle : FrameworkElement
         if (!_pressed) return;
         _pressed = false;
         ReleaseMouseCapture();
+        AnimateScale(_hover ? 1.05 : 1.0, 260, new BackEase { Amplitude = 0.6, EasingMode = EasingMode.EaseOut });
         var p = e.GetPosition(this);
         if (p.X >= 0 && p.Y >= 0 && p.X <= ActualWidth && p.Y <= ActualHeight)
         {
-            if (IsToggle) IsChecked = !IsChecked;
+            if (IsToggle)
+            {
+                IsChecked = !IsChecked;
+                Sfx.Play(IsChecked ? "confirm" : "click");
+            }
+            else if (!string.IsNullOrEmpty(Sound)) Sfx.Play(Sound);
             Click?.Invoke(this);
         }
         InvalidateVisual();
         e.Handled = true;
     }
 
-    protected override void OnMouseEnter(MouseEventArgs e) { _hover = true; InvalidateVisual(); }
-    protected override void OnMouseLeave(MouseEventArgs e) { _hover = false; InvalidateVisual(); }
+    protected override void OnMouseEnter(MouseEventArgs e)
+    {
+        _hover = true;
+        InvalidateVisual();
+        if (IsEnabled) Sfx.Play("hover");
+        AnimateScale(1.05, 120, new QuadraticEase { EasingMode = EasingMode.EaseOut });
+    }
+
+    protected override void OnMouseLeave(MouseEventArgs e)
+    {
+        _hover = false;
+        InvalidateVisual();
+        AnimateScale(1.0, 160, new QuadraticEase { EasingMode = EasingMode.EaseOut });
+    }
+
+    private void AnimateScale(double to, int ms, IEasingFunction? ease)
+    {
+        var a = new DoubleAnimation(to, TimeSpan.FromMilliseconds(ms)) { EasingFunction = ease };
+        _scale.BeginAnimation(ScaleTransform.ScaleXProperty, a);
+        _scale.BeginAnimation(ScaleTransform.ScaleYProperty, a);
+    }
 
     protected override void OnRender(DrawingContext dc)
     {

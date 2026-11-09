@@ -79,6 +79,7 @@ public partial class MainWindow : Window
 
         InitTools();
         InitDucking();
+        InitFx();
 
         // presets
         BuildPresets();
@@ -240,6 +241,8 @@ public partial class MainWindow : Window
     {
         _strip = idx;
         SaveStrip();
+        Wipe.Play();
+        Audio.Sfx.Play("whoosh");
         foreach (var t in StripPanel.Children.OfType<SlashToggle>()) t.IsChecked = false;
         var list = StripPanel.Children.OfType<SlashToggle>().ToList();
         if (idx < list.Count) list[idx].IsChecked = true;
@@ -357,7 +360,7 @@ public partial class MainWindow : Window
 
     private SlashToggle AddPresetButton(string text, string hint, double tilt, Action onClick)
     {
-        var b = new SlashToggle { Text = text, IsToggle = false, Tilt = tilt, Hint = hint, Height = 34, FontSize = 14 };
+        var b = new SlashToggle { Text = text, IsToggle = false, Tilt = tilt, Hint = hint, Height = 34, FontSize = 14, Sound = "confirm" };
         b.Click += _ => onClick();
         PresetPanel.Children.Add(b);
         return b;
@@ -367,7 +370,7 @@ public partial class MainWindow : Window
     {
         if (!_vm.IsConnected) return;
         PresetNameBox.Text = $"Пресет {_settings.Presets.Count + 1}";
-        SaveOverlay.Visibility = Visibility.Visible;
+        ShowOverlay(SaveOverlay);
         PresetNameBox.Focus();
         PresetNameBox.SelectAll();
     }
@@ -654,6 +657,16 @@ public partial class MainWindow : Window
         _trayMute = new System.Windows.Forms.ToolStripMenuItem("Выключить микрофон", null, (_, _) => ToggleMute());
         menu.Items.Add(_trayMute);
         menu.Items.Add("Открыть Voicemeeter", null, (_, _) => _vm.Script("Command.Show=1;"));
+        menu.Items.Add("Папка со своими звуками", null, (_, _) =>
+        {
+            try
+            {
+                System.IO.Directory.CreateDirectory(Audio.Sfx.Folder);
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Audio.Sfx.Folder) { UseShellExecute = true });
+            }
+            catch { /* ignore */ }
+        });
+        menu.Items.Add("Перезагрузить звуки", null, (_, _) => { Audio.Sfx.Load(); Audio.Sfx.Play("confirm"); });
         menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
         menu.Items.Add("Выход", null, (_, _) => ExitApp());
 
@@ -677,6 +690,8 @@ public partial class MainWindow : Window
         _vm.Set(S("Mute"), muted ? 0 : 1);
         MuteT.IsChecked = !muted;
         UpdateTrayMute();
+        Audio.Sfx.Play(muted ? "confirm" : "cancel");
+        if (IsVisible) Shake();
         if (_settings.ShowToast)
         {
             _toast ??= new MicToast();
@@ -701,9 +716,11 @@ public partial class MainWindow : Window
 
     private void ShowFromTray()
     {
+        bool wasHidden = !IsVisible && IsLoaded; // first show plays the intro via Loaded
         Show();
         WindowState = WindowState.Normal;
         Activate();
+        if (wasHidden) PlayEntrance();
     }
 
     private void ExitApp()

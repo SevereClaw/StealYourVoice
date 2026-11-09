@@ -35,10 +35,10 @@
         </Style>
     </Window.Resources>
 
-    <Grid>
+    <Grid x:Name="Root">
         <c:ShardBackground />
 
-        <Grid Margin="28,14,28,14">
+        <Grid x:Name="Stage" Margin="28,14,28,14">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -52,17 +52,17 @@
                     <c:SlashToggle x:Name="UpdateBtn" Text="ОБНОВЛЕНИЕ" IsToggle="True" FontSize="13" Tilt="-2"
                                    Visibility="Collapsed" Hint="Вышла новая версия — нажми, чтобы обновиться и перезапуститься" />
                     <c:SlashToggle x:Name="MinBtn" Text="—" IsToggle="False" Width="58" Hint="Свернуть в трей" />
-                    <c:SlashToggle x:Name="CloseBtn" Text="✕" IsToggle="False" Width="58" Hint="Выход" />
+                    <c:SlashToggle x:Name="CloseBtn" Text="✕" IsToggle="False" Sound="cancel" Width="58" Hint="Выход" />
                 </StackPanel>
-                <c:RansomTitle Text="STEAL YOUR VOICE" Seed="7" LetterSize="34" HorizontalAlignment="Left" />
+                <c:RansomTitle x:Name="TitleText" Text="STEAL YOUR VOICE" Seed="7" LetterSize="34" HorizontalAlignment="Left" />
             </DockPanel>
 
             <!-- Status tag + tools -->
             <DockPanel Grid.Row="1" Margin="0,10,0,4">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                    <c:SlashToggle x:Name="CalibBtn" Text="АВТОНАСТРОЙКА" IsToggle="False" FontSize="13" Height="34" Tilt="-1.5"
+                    <c:SlashToggle x:Name="CalibBtn" Text="АВТОНАСТРОЙКА" IsToggle="False" Sound="" FontSize="13" Height="34" Tilt="-1.5"
                                    Hint="3 секунды тишины + 5 секунд голоса — и программа сама выставит громкость, шумодав и компрессор" />
-                    <c:SlashToggle x:Name="DiagBtn" Text="ДИАГНОСТИКА" IsToggle="False" FontSize="13" Height="34" Tilt="1"
+                    <c:SlashToggle x:Name="DiagBtn" Text="ДИАГНОСТИКА" IsToggle="False" Sound="" FontSize="13" Height="34" Tilt="1"
                                    Hint="Найти типичные проблемы со звуком и микрофоном" />
                 </StackPanel>
                 <Border HorizontalAlignment="Left" VerticalAlignment="Center" Background="#F5F5F5" Padding="14,3,18,3" Margin="6,0,0,6">
@@ -82,7 +82,7 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- MIC CARD -->
-                <Border Grid.Column="0" Style="{StaticResource Card}">
+                <Border x:Name="MicCard" Grid.Column="0" Style="{StaticResource Card}">
                     <Border.RenderTransform>
                         <RotateTransform Angle="-1" />
                     </Border.RenderTransform>
@@ -134,7 +134,7 @@
                 </Border>
 
                 <!-- OUTPUT CARD -->
-                <Border Grid.Column="2" Style="{StaticResource Card}">
+                <Border x:Name="OutCard" Grid.Column="2" Style="{StaticResource Card}">
                     <Border.RenderTransform>
                         <RotateTransform Angle="1" />
                     </Border.RenderTransform>
@@ -197,6 +197,8 @@
                                    Hint="Открыть окно Voicemeeter" />
                     <c:SlashToggle x:Name="RestartBtn" Text="РЕСТАРТ ЗВУКА" IsToggle="False" FontSize="12" Height="32" Tilt="-1"
                                    Hint="Restart Audio Engine — если звук заикается или пропал" />
+                    <c:SlashToggle x:Name="SfxT" Text="ЗВУКИ" FontSize="12" Height="32" Tilt="1.5"
+                                   Hint="Звуки интерфейса. Свои .wav (hover, click, confirm, cancel, whoosh) можно положить в папку звуков — см. меню иконки в трее" />
                     <c:SlashToggle x:Name="AutostartT" Text="АВТОЗАПУСК" FontSize="12" Height="32" Tilt="-1"
                                    Hint="Запускаться вместе с Windows (сразу в трей)" />
                 </WrapPanel>
@@ -238,8 +240,8 @@
                              Background="#1A1A1A" Foreground="#F5F5F5" CaretBrush="#F5F5F5" SelectionBrush="#E60012"
                              BorderBrush="#E60012" BorderThickness="3" Padding="10,6" Margin="0,0,0,16" />
                     <StackPanel Orientation="Horizontal">
-                        <c:SlashToggle x:Name="SaveOk" Text="СОХРАНИТЬ" IsToggle="False" Height="40" FontSize="16" />
-                        <c:SlashToggle x:Name="SaveCancel" Text="ОТМЕНА" IsToggle="False" Height="40" FontSize="16" />
+                        <c:SlashToggle x:Name="SaveOk" Text="СОХРАНИТЬ" IsToggle="False" Sound="confirm" Height="40" FontSize="16" />
+                        <c:SlashToggle x:Name="SaveCancel" Text="ОТМЕНА" IsToggle="False" Sound="cancel" Height="40" FontSize="16" />
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -252,10 +254,13 @@
                 <TextBlock x:Name="OfflineText" Text="Ищу Voicemeeter..." Foreground="#F5F5F5" FontFamily="Arial Black"
                            FontSize="16" HorizontalAlignment="Center" Margin="0,26,0,18" TextAlignment="Center" />
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                    <c:SlashToggle x:Name="LaunchBtn" Text="ЗАПУСТИТЬ VOICEMEETER" IsToggle="False" Height="44" FontSize="17" />
-                    <c:SlashToggle x:Name="OfflineCloseBtn" Text="ВЫХОД" IsToggle="False" Height="44" FontSize="17" />
+                    <c:SlashToggle x:Name="LaunchBtn" Text="ЗАПУСТИТЬ VOICEMEETER" IsToggle="False" Sound="confirm" Height="44" FontSize="17" />
+                    <c:SlashToggle x:Name="OfflineCloseBtn" Text="ВЫХОД" IsToggle="False" Sound="cancel" Height="44" FontSize="17" />
                 </StackPanel>
             </StackPanel>
         </Grid>
+
+        <!-- transition layer -->
+        <c:SlashWipe x:Name="Wipe" />
     </Grid>
 </Window>
