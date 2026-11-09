@@ -215,6 +215,27 @@ public partial class MainWindow
                 "ВЫБРАТЬ", () => { CloseTool(); ShowHeadphonesMenu("Выбери наушники"); });
         }
 
+        // computer sound leaking into B1 = Discord hears your PC (and friends hear themselves)
+        int virtualCount = _vm.Type switch { VmType.Standard => 1, VmType.Banana => 2, _ => 3 };
+        for (int v = 0; v < virtualCount; v++)
+        {
+            int idx = _vm.HardwareStrips + v;
+            if (_vm.Get($"Strip[{idx}].B1") < 0.5f) continue;
+            var name = v == 0 ? "Voicemeeter Input" : v == 1 ? "Voicemeeter AUX" : "Voicemeeter VAIO3";
+            Count(Sev.Fail);
+            AddRow(Sev.Fail, $"Звук компьютера ({name}) уходит в B1 — в Discord слышат всё, что у тебя играет, " +
+                             "а друзья слышат сами себя (из-за этого Discord режет твой голос).",
+                "УБРАТЬ ИЗ B1", () => _vm.Set($"Strip[{idx}].B1", 0));
+        }
+
+        if (_vm.Type != VmType.Standard &&
+            _vm.Get($"Strip[{_vm.HardwareStrips}].B2") >= 0.5f && _vm.Get(S("B2")) < 0.5f)
+        {
+            Count(Sev.Warn);
+            AddRow(Sev.Warn, "Игра идёт в B2 (клипы), а твой голос — нет: в клипах будет игра без голоса.",
+                "ГОЛОС В B2", () => _vm.Set(S("B2"), 1));
+        }
+
         // ── signal ──
         if (!rep.HeardVoice)
         {

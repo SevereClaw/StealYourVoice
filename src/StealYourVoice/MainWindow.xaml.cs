@@ -207,7 +207,8 @@ public partial class MainWindow : Window
 
         SetSlider(OutGainS, _vm.Get(B1("Gain")));
         OutMuteT.IsChecked = _vm.Get(B1("Mute")) >= 0.5f;
-        GameToB1T.IsChecked = _vm.Get($"Strip[{_vm.HardwareStrips}].B1") >= 0.5f;
+        GameToB2T.IsChecked = _vm.Type != VmType.Standard && _vm.Get($"Strip[{_vm.HardwareStrips}].B2") >= 0.5f;
+        GameToB2T.Visibility = _vm.Type == VmType.Standard ? Visibility.Collapsed : Visibility.Visible;
         DuckAuxT.Visibility = _vm.Type == VmType.Standard ? Visibility.Collapsed : Visibility.Visible;
 
         var dev = _vm.GetString(S("device.name"));
@@ -588,7 +589,21 @@ public partial class MainWindow : Window
         DuckAuxT.Click += t => { _settings.DuckAux = t.IsChecked; _settings.Save(); };
         DuckAmountS.ValueChanged += v => { _settings.DuckAmount = v; _settings.Save(); };
         DuckThreshS.ValueChanged += v => { _settings.DuckThreshold = v; _settings.Save(); };
-        GameToB1T.Click += t => _vm.Set($"Strip[{_vm.HardwareStrips}].B1", t.IsChecked ? 1 : 0);
+        GameToB2T.Click += t =>
+        {
+            int vin = _vm.HardwareStrips; // "Voicemeeter Input" virtual strip
+            if (t.IsChecked)
+            {
+                // clips mix on B2: computer sound + your voice; Discord (B1) keeps voice only
+                _vm.Script($"Strip[{vin}].B2=1;Strip[{vin}].B1=0;{S("B2")}=1;");
+                StatusText.Text = "SHADOWPLAY: МИКРОФОН = VOICEMEETER OUT B2, СИСТЕМНЫЕ ЗВУКИ = 0%";
+            }
+            else
+            {
+                _vm.Script($"Strip[{vin}].B2=0;");
+                StatusText.Text = "SHADOWPLAY: МИКРОФОН = VOICEMEETER OUT B1, СИСТЕМНЫЕ ЗВУКИ = 100%";
+            }
+        };
     }
 
     private void DuckTick()

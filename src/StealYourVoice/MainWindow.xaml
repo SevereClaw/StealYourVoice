@@ -165,8 +165,8 @@
                                            Hint="Приглушать виртуальный вход «Voicemeeter Input» (обычно туда идёт весь звук Windows / игра)" />
                             <c:SlashToggle x:Name="DuckAuxT" Text="AUX" FontSize="13" Height="32" Tilt="1"
                                            Hint="Приглушать виртуальный вход «Voicemeeter AUX» (например, музыка или Discord)" />
-                            <c:SlashToggle x:Name="GameToB1T" Text="ИГРУ В ЗАПИСЬ" FontSize="13" Height="32"
-                                           Hint="Отправлять Voicemeeter Input ещё и в B1 — тогда в клипе ShadowPlay будет игра уже с приглушением. В ShadowPlay поставь «Системные звуки» на 0%" />
+                            <c:SlashToggle x:Name="GameToB2T" Text="ИГРА → КЛИПЫ (B2)" FontSize="13" Height="32"
+                                           Hint="Звук компьютера (уже приглушённый) + твой голос уходят в шину B2 — только для ShadowPlay. В Discord (B1) остаётся только голос. В ShadowPlay: микрофон = Voicemeeter Out B2, «Системные звуки» = 0%" />
                         </WrapPanel>
                         <Grid Margin="0,4,0,0">
                             <Grid.ColumnDefinitions>
