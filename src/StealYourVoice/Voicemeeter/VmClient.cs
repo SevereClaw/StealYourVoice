@@ -132,6 +132,22 @@ public sealed class VmClient : IDisposable
         return PeakOf(1, first, count);
     }
 
+    /// <summary>Left/right level (linear) of an input strip. type: 0 = pre-fader (raw input), 1 = post-fader.</summary>
+    public (float L, float R) StripChannels(int strip, int type)
+    {
+        if (!IsConnected) return (0, 0);
+        int hw = HardwareStrips;
+        int first = strip < hw ? strip * 2 : hw * 2 + (strip - hw) * 8;
+        float l = 0, r = 0;
+        try
+        {
+            VmNative.GetLevel(type, first, out l);
+            VmNative.GetLevel(type, first + 1, out r);
+        }
+        catch { /* ignore */ }
+        return (l, r);
+    }
+
     /// <summary>Peak level (linear) of an output bus.</summary>
     public float BusLevel(int bus) => IsConnected ? PeakOf(3, bus * 8, 2) : 0;
 

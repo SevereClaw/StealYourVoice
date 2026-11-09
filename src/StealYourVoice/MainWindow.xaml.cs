@@ -76,6 +76,8 @@ public partial class MainWindow : Window
         OutGainS.ValueChanged += v => _vm.Set(B1("Gain"), (float)v);
         OutMuteT.Click += t => _vm.Set(B1("Mute"), t.IsChecked ? 1 : 0);
 
+        InitTools();
+
         // presets
         BuildPresets();
         SaveOk.Click += _ => SaveNewPreset();
@@ -145,6 +147,8 @@ public partial class MainWindow : Window
             MicMeter.Push(_vm.StripLevel(_strip));
             OutMeter.Push(_vm.BusLevel(_vm.B1Index));
         }
+
+        ToolTick();
     }
 
     private void OnConnected()

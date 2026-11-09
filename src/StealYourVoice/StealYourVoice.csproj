@@ -12,7 +12,7 @@
     <AssemblyName>StealYourVoice</AssemblyName>
     <RootNamespace>StealYourVoice</RootNamespace>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <Product>Steal Your Voice</Product>
     <Description>Persona 5 style control panel for Voicemeeter</Description>
   </PropertyGroup>
