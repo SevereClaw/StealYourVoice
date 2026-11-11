@@ -57,6 +57,11 @@ public sealed class Settings
 
     /// <summary>"Who is talking" overlay: 0 = off, 1..4 = TL, TR, BL, BR.</summary>
     public int SpeakersCorner { get; set; }
+    public bool SpeakersOnlyTalking { get; set; }
+    public bool SpeakersAvatarsOnly { get; set; }
+    public bool SpeakersShowSelf { get; set; } = true;
+    public double SpeakersSilentOpacity { get; set; } = 0.3;
+    public double SpeakersScale { get; set; } = 1.0;
 
     private static readonly string Dir =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StealYourVoice");

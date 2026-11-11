@@ -815,6 +815,7 @@ public partial class MainWindow : Window
 
     private void UpdateTrayMute()
     {
+        UpdateSpeakers(); // your own row shows the crossed-out mic
         if (_trayMute == null) return;
         _trayMute.Text = MuteT.IsChecked ? "Включить микрофон" : "Выключить микрофон";
     }

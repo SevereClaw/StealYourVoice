@@ -37,6 +37,8 @@ public partial class MainWindow
     private readonly Dictionary<string, string> _dcNames = new();
     private readonly Dictionary<string, string> _dcAvatars = new();
     private List<string> _dcCurrent = new();
+    private readonly Dictionary<string, (bool MicOff, bool Deaf)> _dcFlags = new();
+    private bool _dcSelfInChannel;
     private SpeakersOverlay? _speakers;
 
     private bool DcConfigured =>
@@ -97,6 +99,18 @@ public partial class MainWindow
             SpeakersBtn.Text = "КТО ГОВОРИТ: " + CornerNames[_settings.SpeakersCorner];
             UpdateSpeakers();
         };
+        _settings.SpeakersSilentOpacity = Math.Clamp(_settings.SpeakersSilentOpacity, 0.05, 1);
+        _settings.SpeakersScale = Math.Clamp(_settings.SpeakersScale, 0.7, 1.6);
+        SpkTalkOnlyT.IsChecked = _settings.SpeakersOnlyTalking;
+        SpkNoNamesT.IsChecked = _settings.SpeakersAvatarsOnly;
+        SpkSelfT.IsChecked = _settings.SpeakersShowSelf;
+        SpkOpacityS.Value = Math.Round(_settings.SpeakersSilentOpacity * 100);
+        SpkScaleS.Value = Math.Round(_settings.SpeakersScale * 100);
+        SpkTalkOnlyT.Click += t => { _settings.SpeakersOnlyTalking = t.IsChecked; _settings.Save(); UpdateSpeakers(); };
+        SpkNoNamesT.Click += t => { _settings.SpeakersAvatarsOnly = t.IsChecked; _settings.Save(); UpdateSpeakers(); };
+        SpkSelfT.Click += t => { _settings.SpeakersShowSelf = t.IsChecked; _settings.Save(); UpdateSpeakers(); };
+        SpkOpacityS.ValueChanged += v => { _settings.SpeakersSilentOpacity = v / 100.0; _settings.Save(); UpdateSpeakers(); };
+        SpkScaleS.ValueChanged += v => { _settings.SpeakersScale = v / 100.0; _settings.Save(); UpdateSpeakers(); };
         _dcStatus = DcConfigured ? "ПОДКЛЮЧАЮСЬ..." : "НЕ НАСТРОЕНО";
         DcRender();
     }
@@ -126,6 +140,7 @@ public partial class MainWindow
         _dcAuthed = false;
         _dcChannelId = null;
         _dcUserId = null;
+        _dcSelfInChannel = false;
         _dcApplied.Clear();
         _dcSpeaking.Clear();
         old?.Dispose();
@@ -274,6 +289,7 @@ public partial class MainWindow
             if (data.ValueKind != JsonValueKind.Object)
             {
                 _dcChannelId = null;
+                _dcSelfInChannel = false;
                 _dcSpeaking.Clear();
                 _dcStatus = "ПОДКЛЮЧЕНО // ЗАЙДИ В ГОЛОСОВОЙ КАНАЛ";
                 DcSetFriends(new List<(string, string, int, bool)>());
@@ -298,6 +314,7 @@ public partial class MainWindow
                 }
             }
 
+            bool selfSeen = false;
             var friends = new List<(string Id, string Name, int Volume, bool Mute)>();
             if (data.TryGetProperty("voice_states", out var states) && states.ValueKind == JsonValueKind.Array)
             {
@@ -305,8 +322,24 @@ public partial class MainWindow
                 {
                     if (!vs.TryGetProperty("user", out var user)) continue;
                     var id = DiscordRpc.Str(user, "id");
-                    if (id == null || id == _dcUserId) continue;
+                    if (id == null) continue;
                     var name = DiscordRpc.Str(vs, "nick") ?? DiscordRpc.Str(user, "global_name") ?? DiscordRpc.Str(user, "username") ?? id;
+
+                    bool micOff = false, deaf = false;
+                    if (vs.TryGetProperty("voice_state", out var st) && st.ValueKind == JsonValueKind.Object)
+                    {
+                        micOff = DcFlag(st, "self_mute") || DcFlag(st, "mute") || DcFlag(st, "suppress");
+                        deaf = DcFlag(st, "self_deaf") || DcFlag(st, "deaf");
+                    }
+                    _dcFlags[id] = (micOff, deaf);
+
+                    if (id == _dcUserId)
+                    {
+                        selfSeen = true;
+                        _dcNames[id] = name;
+                        _dcAvatars[id] = AvatarUrl(id, DiscordRpc.Str(user, "avatar"));
+                        continue;
+                    }
                     int vol = vs.TryGetProperty("volume", out var v) && v.ValueKind == JsonValueKind.Number
                         ? (int)Math.Round(v.GetDouble()) : 100;
                     bool mute = vs.TryGetProperty("mute", out var m) && m.ValueKind == JsonValueKind.True;
@@ -317,12 +350,14 @@ public partial class MainWindow
                         DcSetUser(id, saved, null);
                         vol = saved;
                     }
+                    if (mute) _dcFlags[id] = (true, deaf); // muted by you
                     _dcNames[id] = name;
                     _dcAvatars[id] = AvatarUrl(id, DiscordRpc.Str(user, "avatar"));
                     friends.Add((id, name, vol, mute));
                 }
             }
 
+            _dcSelfInChannel = selfSeen;
             var chName = DiscordRpc.Str(data, "name");
             _dcStatus = friends.Count == 0
                 ? "В КАНАЛЕ ТОЛЬКО ТЫ"
@@ -360,6 +395,9 @@ public partial class MainWindow
         UpdateSpeakers();
     }
 
+    private static bool DcFlag(JsonElement e, string name) =>
+        e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.True;
+
     private static string AvatarUrl(string id, string? hash)
     {
         if (!string.IsNullOrEmpty(hash)) return $"https://cdn.discordapp.com/avatars/{id}/{hash}.png?size=64";
@@ -372,14 +410,26 @@ public partial class MainWindow
     private void UpdateSpeakers()
     {
         if (_settings.SpeakersCorner == 0) { _speakers?.Hide(); return; }
-        var members = _dcCurrent
-            .Select(id => (Id: id, Name: _dcNames.GetValueOrDefault(id, id), Avatar: _dcAvatars.GetValueOrDefault(id)))
-            .ToList();
+        var members = new List<SpeakerInfo>();
+        if (_settings.SpeakersShowSelf && _dcSelfInChannel && _dcUserId != null)
+        {
+            var f = _dcFlags.GetValueOrDefault(_dcUserId);
+            // your real mute is the one in Voicemeeter, so it counts too
+            members.Add(new SpeakerInfo(_dcUserId, _dcNames.GetValueOrDefault(_dcUserId, "ТЫ"),
+                _dcAvatars.GetValueOrDefault(_dcUserId), f.MicOff || MuteT.IsChecked, f.Deaf));
+        }
+        foreach (var id in _dcCurrent)
+        {
+            var f = _dcFlags.GetValueOrDefault(id);
+            members.Add(new SpeakerInfo(id, _dcNames.GetValueOrDefault(id, id), _dcAvatars.GetValueOrDefault(id), f.MicOff, f.Deaf));
+        }
         if (members.Count == 0 && _speakers == null) return;
         _speakers ??= new SpeakersOverlay();
         // same corner as the mic indicator → sit right next to it instead of on top
         bool shared = _settings.OverlayCorner == _settings.SpeakersCorner;
-        _speakers.SetMembers(members, _settings.SpeakersCorner, shared ? 36 : 0);
+        _speakers.SetMembers(members, _settings.SpeakersCorner, shared ? 36 : 0,
+            new SpeakerStyle(_settings.SpeakersOnlyTalking, _settings.SpeakersSilentOpacity,
+                _settings.SpeakersScale, _settings.SpeakersAvatarsOnly));
         _speakers.SetSpeaking(_dcSpeaking);
     }
 
@@ -446,7 +496,7 @@ public partial class MainWindow
 
         // someone who left mid-word never sends SPEAKING_STOP
         _dcCurrent = friends.OrderBy(f => f.Name, StringComparer.CurrentCultureIgnoreCase).Select(f => f.Id).ToList();
-        _dcSpeaking.IntersectWith(friends.Select(f => f.Id));
+        _dcSpeaking.IntersectWith(friends.Select(f => f.Id).Append(_dcUserId ?? ""));
         UpdateSpeakers();
     }
 
@@ -458,6 +508,7 @@ public partial class MainWindow
         DcConnectBtn.Visibility = setup;
         DcPortalBtn.Visibility = setup;
         DcForgetBtn.Visibility = DcConfigured ? Visibility.Visible : Visibility.Collapsed;
+        DcViewPanel.Visibility = _dcAuthed ? Visibility.Visible : Visibility.Collapsed;
         DcSecretHint.Text = string.IsNullOrEmpty(_settings.DiscordSecretEnc)
             ? "CLIENT SECRET" : "CLIENT SECRET  (уже сохранён — оставь пустым, чтобы не менять)";
     }

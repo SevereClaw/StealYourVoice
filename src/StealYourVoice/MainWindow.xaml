@@ -286,17 +286,42 @@
                                      BorderBrush="#E60012" BorderThickness="3" Padding="10,6" Margin="0,0,0,4" />
                     </StackPanel>
 
-                    <ScrollViewer MaxHeight="420" VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer MaxHeight="290" VerticalScrollBarVisibility="Auto">
                         <StackPanel x:Name="DcFriendsPanel" Margin="0,0,10,0" />
                     </ScrollViewer>
+
+                    <StackPanel x:Name="DcViewPanel">
+                        <TextBlock Style="{StaticResource SubHeader}" Text="СПИСОК ПОВЕРХ ИГРЫ" Margin="0,8,0,6" />
+                        <WrapPanel>
+                            <c:SlashToggle x:Name="SpeakersBtn" Text="КТО ГОВОРИТ: ВЫКЛ" IsToggle="False" Height="32" FontSize="12"
+                                           Hint="Поверх игры показывать людей из голосового канала с аватарками. Каждое нажатие — следующий угол экрана" />
+                            <c:SlashToggle x:Name="SpkTalkOnlyT" Text="ТОЛЬКО ГОВОРЯЩИЕ" Height="32" FontSize="12" Tilt="-1"
+                                           Hint="Показывать человека, только пока он говорит. Выключено — видны все, молчащие полупрозрачные" />
+                            <c:SlashToggle x:Name="SpkNoNamesT" Text="БЕЗ ИМЁН" Height="32" FontSize="12" Tilt="1"
+                                           Hint="Только аватарки — узкий столбик" />
+                            <c:SlashToggle x:Name="SpkSelfT" Text="ПОКАЗЫВАТЬ МЕНЯ" Height="32" FontSize="12"
+                                           Hint="Ты сам первой строкой, со значком выключенного микрофона при mute" />
+                        </WrapPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="24" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <c:SlashSlider x:Name="SpkOpacityS" Grid.Column="0" Label="ВИДИМОСТЬ МОЛЧАЩИХ" Minimum="5" Maximum="100"
+                                           Default="30" Step="5" Unit="%" Decimals="0"
+                                           Hint="Насколько видны те, кто молчит: 5% — почти невидимы, 100% — как говорящие" />
+                            <c:SlashSlider x:Name="SpkScaleS" Grid.Column="2" Label="РАЗМЕР" Minimum="70" Maximum="160"
+                                           Default="100" Step="10" Unit="%" Decimals="0"
+                                           Hint="Размер плашек в списке" />
+                        </Grid>
+                    </StackPanel>
 
                     <WrapPanel Margin="0,14,0,0">
                         <c:SlashToggle x:Name="DcConnectBtn" Text="ПОДКЛЮЧИТЬ" IsToggle="False" Sound="" Height="40" FontSize="15" />
                         <c:SlashToggle x:Name="DcPortalBtn" Text="ОТКРЫТЬ ПОРТАЛ" IsToggle="False" Height="40" FontSize="15" />
                         <c:SlashToggle x:Name="DcForgetBtn" Text="СБРОСИТЬ КЛЮЧИ" IsToggle="False" Sound="cancel" Height="40" FontSize="15"
                                        Hint="Отключиться от Discord и удалить сохранённые ID, secret и разрешение" />
-                        <c:SlashToggle x:Name="SpeakersBtn" Text="КТО ГОВОРИТ: ВЫКЛ" IsToggle="False" Height="40" FontSize="15"
-                                       Hint="Поверх игры показывать всех из голосового канала с аватарками: молчит — полупрозрачный, говорит — яркий. Каждое нажатие — следующий угол экрана" />
                         <c:SlashToggle x:Name="DcCloseBtn" Text="ЗАКРЫТЬ" IsToggle="False" Sound="cancel" Height="40" FontSize="15" />
                     </WrapPanel>
                 </StackPanel>

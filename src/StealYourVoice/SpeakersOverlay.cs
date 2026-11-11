@@ -10,18 +10,22 @@ using StealYourVoice.Controls;
 
 namespace StealYourVoice;
 
+public record SpeakerInfo(string Id, string Name, string? Avatar, bool MicOff, bool Deaf);
+
+public record SpeakerStyle(bool OnlyTalking, double SilentOpacity, double Scale, bool AvatarsOnly);
+
 /// <summary>
-/// Click-through list of everyone in the Discord voice channel, shown over the game:
-/// avatar + name, see-through while silent, solid while talking.
+/// Click-through list of the Discord voice channel, shown over the game:
+/// avatar + name + mute/deaf badges; see-through while silent, solid while talking.
 /// </summary>
 public sealed class SpeakersOverlay : Window
 {
-    private const double SilentOpacity = 0.28;
-
     private readonly StackPanel _stack = new() { Margin = new Thickness(8, 2, 8, 2) };
+    private readonly ScaleTransform _scale = new(1, 1);
     private readonly Dictionary<string, Border> _rows = new();
     private readonly Dictionary<string, bool> _lit = new();
     private static readonly Dictionary<string, BitmapImage> AvatarCache = new();
+    private SpeakerStyle _style = new(false, 0.28, 1, false);
     private string _signature = "";
     private int _corner = 1;
     private double _offset;
@@ -38,6 +42,7 @@ public sealed class SpeakersOverlay : Window
         IsHitTestVisible = false;
         ResizeMode = ResizeMode.NoResize;
         SizeToContent = SizeToContent.WidthAndHeight;
+        _stack.LayoutTransform = _scale;
         Content = _stack;
         SourceInitialized += (_, _) => MiniOverlay.MakeClickThrough(this);
         SizeChanged += (_, _) => Place();
@@ -45,12 +50,14 @@ public sealed class SpeakersOverlay : Window
 
     /// <param name="corner">1 = top-left, 2 = top-right, 3 = bottom-left, 4 = bottom-right</param>
     /// <param name="offset">vertical gap from the screen edge (to sit next to the mic indicator)</param>
-    public void SetMembers(IReadOnlyList<(string Id, string Name, string? Avatar)> members, int corner, double offset)
+    public void SetMembers(IReadOnlyList<SpeakerInfo> members, int corner, double offset, SpeakerStyle style)
     {
-        var signature = corner + "|" + string.Join("|", members.Select(m => m.Id + ":" + m.Name + ":" + m.Avatar));
+        var signature = $"{corner}|{style}|" + string.Join("|", members.Select(m => m.ToString()));
         bool moved = corner != _corner || Math.Abs(offset - _offset) > 0.1;
         _corner = corner;
         _offset = offset;
+        _style = style;
+        _scale.ScaleX = _scale.ScaleY = style.Scale;
 
         if (signature != _signature)
         {
@@ -61,7 +68,7 @@ public sealed class SpeakersOverlay : Window
             bool right = corner is 2 or 4;
             foreach (var m in members)
             {
-                var row = BuildRow(m.Id, m.Name, m.Avatar, right);
+                var row = BuildRow(m, right, style);
                 _rows[m.Id] = row;
                 _stack.Children.Add(row);
             }
@@ -82,14 +89,24 @@ public sealed class SpeakersOverlay : Window
             if (_lit.TryGetValue(kv.Key, out var was) && was == on) continue;
             _lit[kv.Key] = on;
             kv.Value.BorderBrush = on ? P5.Red : P5.White;
-            kv.Value.BeginAnimation(OpacityProperty,
-                new DoubleAnimation(on ? 1.0 : SilentOpacity, TimeSpan.FromMilliseconds(on ? 70 : 260)));
+
+            if (_style.OnlyTalking)
+            {
+                kv.Value.BeginAnimation(OpacityProperty, null);
+                kv.Value.Opacity = 1;
+                kv.Value.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+            }
+            else
+            {
+                kv.Value.BeginAnimation(OpacityProperty,
+                    new DoubleAnimation(on ? 1.0 : _style.SilentOpacity, TimeSpan.FromMilliseconds(on ? 70 : 260)));
+            }
         }
     }
 
-    private static Border BuildRow(string id, string fullName, string? avatarUrl, bool right)
+    private static Border BuildRow(SpeakerInfo m, bool right, SpeakerStyle style)
     {
-        var name = fullName.Length > 22 ? fullName[..20] + "…" : fullName;
+        var name = m.Name.Length > 22 ? m.Name[..20] + "…" : m.Name;
 
         // fallback tile with the first letter, in case the avatar can't be downloaded
         var avatar = new Grid { Width = 30, Height = 30 };
@@ -106,7 +123,7 @@ public sealed class SpeakersOverlay : Window
                 VerticalAlignment = VerticalAlignment.Center
             }
         });
-        var bmp = LoadAvatar(avatarUrl);
+        var bmp = LoadAvatar(m.Avatar);
         if (bmp != null)
         {
             var img = new Image { Source = bmp, Stretch = Stretch.UniformToFill };
@@ -115,21 +132,51 @@ public sealed class SpeakersOverlay : Window
             avatar.Children.Add(img);
         }
 
-        var text = new TextBlock
+        StackPanel? badges = null;
+        if (m.MicOff || m.Deaf)
         {
-            Text = name.ToUpperInvariant(),
-            FontFamily = new FontFamily("Arial Black"),
-            FontStyle = FontStyles.Italic,
-            FontSize = 14,
-            Foreground = P5.White,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(10, 0, 14, 1)
-        };
+            badges = new StackPanel { Orientation = Orientation.Horizontal };
+            if (m.MicOff) badges.Children.Add(new StatusIcon(false));
+            if (m.Deaf) badges.Children.Add(new StatusIcon(true));
+        }
 
         var row = new DockPanel();
         DockPanel.SetDock(avatar, Dock.Left);
         row.Children.Add(avatar);
-        row.Children.Add(text);
+
+        if (style.AvatarsOnly)
+        {
+            if (badges != null)
+            {
+                // tiny badges tucked into the avatar's corner
+                badges.LayoutTransform = new ScaleTransform(0.8, 0.8);
+                avatar.Children.Add(new Border
+                {
+                    Child = badges, Background = P5.Black,
+                    HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom
+                });
+            }
+        }
+        else
+        {
+            if (badges != null)
+            {
+                badges.Margin = new Thickness(0, 0, 8, 0);
+                badges.VerticalAlignment = VerticalAlignment.Center;
+                DockPanel.SetDock(badges, Dock.Right);
+                row.Children.Add(badges);
+            }
+            row.Children.Add(new TextBlock
+            {
+                Text = name.ToUpperInvariant(),
+                FontFamily = new FontFamily("Arial Black"),
+                FontStyle = FontStyles.Italic,
+                FontSize = 14,
+                Foreground = P5.White,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(10, 0, badges != null ? 8 : 14, 1)
+            });
+        }
 
         return new Border
         {
@@ -138,7 +185,8 @@ public sealed class SpeakersOverlay : Window
             BorderBrush = P5.White,
             BorderThickness = new Thickness(2),
             Margin = new Thickness(0, 2, 0, 2),
-            Opacity = SilentOpacity,
+            Opacity = style.OnlyTalking ? 1 : style.SilentOpacity,
+            Visibility = style.OnlyTalking ? Visibility.Collapsed : Visibility.Visible,
             HorizontalAlignment = right ? HorizontalAlignment.Right : HorizontalAlignment.Left
         };
     }
@@ -168,5 +216,58 @@ public sealed class SpeakersOverlay : Window
         const double m = 10;
         Left = _corner is 1 or 3 ? a.Left + m : a.Right - ActualWidth - m;
         Top = _corner is 1 or 2 ? a.Top + m + _offset : a.Bottom - ActualHeight - m - _offset;
+    }
+
+    /// <summary>16×16 hand-drawn badge: crossed-out microphone or crossed-out headphones.</summary>
+    private sealed class StatusIcon : FrameworkElement
+    {
+        private readonly bool _headphones;
+
+        public StatusIcon(bool headphones)
+        {
+            _headphones = headphones;
+            Width = 16;
+            Height = 16;
+            Margin = new Thickness(2, 0, 2, 0);
+        }
+
+        protected override void OnRender(DrawingContext dc)
+        {
+            var white = P5.Pen(P5.White, 1.6);
+            if (_headphones)
+            {
+                // headband
+                var band = new StreamGeometry();
+                using (var c = band.Open())
+                {
+                    c.BeginFigure(new Point(3, 10), false, false);
+                    c.ArcTo(new Point(13, 10), new Size(5, 6), 0, false, SweepDirection.Clockwise, true, false);
+                }
+                band.Freeze();
+                dc.DrawGeometry(null, white, band);
+                // ear cups
+                dc.DrawRectangle(P5.White, null, new Rect(1.5, 9, 3.5, 5.5));
+                dc.DrawRectangle(P5.White, null, new Rect(11, 9, 3.5, 5.5));
+            }
+            else
+            {
+                // capsule
+                dc.DrawRoundedRectangle(P5.White, null, new Rect(5.5, 1, 5, 8.5), 2.5, 2.5);
+                // cradle
+                var cradle = new StreamGeometry();
+                using (var c = cradle.Open())
+                {
+                    c.BeginFigure(new Point(3.5, 7), false, false);
+                    c.ArcTo(new Point(12.5, 7), new Size(4.5, 4.5), 0, false, SweepDirection.Counterclockwise, true, false);
+                }
+                cradle.Freeze();
+                dc.DrawGeometry(null, white, cradle);
+                // stem
+                dc.DrawLine(white, new Point(8, 11.5), new Point(8, 15));
+            }
+            // the slash
+            dc.DrawLine(P5.Pen(P5.Black, 4.2), new Point(2, 14.5), new Point(14, 1.5));
+            dc.DrawLine(P5.Pen(P5.Red, 2.2), new Point(2, 14.5), new Point(14, 1.5));
+        }
     }
 }
