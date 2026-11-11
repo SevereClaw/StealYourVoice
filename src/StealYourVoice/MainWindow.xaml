@@ -150,28 +150,20 @@
                             <DockPanel Margin="0,12,0,6">
                                 <TextBlock x:Name="DiscordState" DockPanel.Dock="Right" Text="ТИШИНА" Foreground="#808080"
                                            FontFamily="Arial Black" FontSize="12" VerticalAlignment="Bottom" Margin="0,0,4,3" />
-                                <TextBlock Style="{StaticResource SubHeader}" DockPanel.Dock="Left" Text="DISCORD // AUX" Margin="0"
+                                <TextBlock Style="{StaticResource SubHeader}" Text="DISCORD // AUX" Margin="0"
                                            ToolTip="В Discord поставь устройство вывода «Voicemeeter AUX Input» — тогда голоса друзей идут отдельно от игры" />
-                                <c:SlashToggle x:Name="FriendsBtn" DockPanel.Dock="Left" Text="ДРУЗЬЯ" IsToggle="False" Sound="" FontSize="12" Height="28"
-                                               VerticalAlignment="Bottom" Margin="14,0,0,0"
-                                               Hint="Громкость каждого человека в голосовом канале отдельно" />
-                                <c:SlashToggle x:Name="FriendsClipsT" Text="В КЛИПЫ" FontSize="12" Height="28"
-                                               HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10,0,0,0"
-                                               Hint="Записывать голоса друзей в клипы ShadowPlay. Выключено — в клипах только игра и ты. Работает через шину B2: в ShadowPlay микрофон = Voicemeeter Out B2, «Системные звуки» = 0%" />
                             </DockPanel>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="24" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <c:SlashSlider x:Name="AuxGainS" Grid.Column="0" Label="ГРОМКОСТЬ ДРУЗЕЙ"
-                                               Minimum="-60" Maximum="12" Default="0" Step="0.5" Unit=" dB"
-                                               Hint="Громкость Discord отдельно от игры. Работает, если в Discord устройство вывода — «Voicemeeter AUX Input»" />
-                                <c:SlashToggle x:Name="DuckFriendsT" Grid.Column="2" Text="ИГРА ТИШЕ ПОД ДРУЗЕЙ" FontSize="12" Height="32"
-                                               HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="0,0,0,4"
+                            <c:SlashSlider x:Name="AuxGainS" Label="ГРОМКОСТЬ ДРУЗЕЙ"
+                                           Minimum="-60" Maximum="12" Default="0" Step="0.5" Unit=" dB"
+                                           Hint="Громкость Discord отдельно от игры. Работает, если в Discord устройство вывода — «Voicemeeter AUX Input»" />
+                            <WrapPanel Margin="0,10,0,0">
+                                <c:SlashToggle x:Name="FriendsBtn" Text="ДРУЗЬЯ" IsToggle="False" Sound="" FontSize="12" Height="32"
+                                               Hint="Громкость каждого человека в голосовом канале отдельно" />
+                                <c:SlashToggle x:Name="FriendsClipsT" Text="В КЛИПЫ" FontSize="12" Height="32" Tilt="1"
+                                               Hint="Записывать голоса друзей в клипы ShadowPlay. Выключено — в клипах только игра и ты. Работает через шину B2: в ShadowPlay микрофон = Voicemeeter Out B2, «Системные звуки» = 0%" />
+                                <c:SlashToggle x:Name="DuckFriendsT" Text="ИГРА ТИШЕ ПОД ДРУЗЕЙ" FontSize="12" Height="32" Tilt="-1"
                                                Hint="Когда говорят друзья в Discord, игра стихает (на столько же, сколько в «НА СКОЛЬКО»)" />
-                            </Grid>
+                            </WrapPanel>
                         </StackPanel>
                     </StackPanel>
                 </Border>

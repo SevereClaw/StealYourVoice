@@ -23,7 +23,16 @@ public sealed class AppDucker
     private static readonly string BackupFile = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StealYourVoice", "ducked-apps.json");
 
-    private readonly List<(SimpleAudioVolume Volume, float Base, string Name)> _held = new();
+    private sealed class Held
+    {
+        public SimpleAudioVolume Volume = null!;
+        public float Base;
+        public float LastSet = -1;
+        public bool LetGo; // the user moved this app's slider themselves — hands off
+        public string Name = "";
+    }
+
+    private readonly List<Held> _held = new();
 
     /// <summary>Process names (no .exe) that must not be ducked.</summary>
     public ICollection<string> Exclude { get; set; } = new List<string>();
@@ -98,7 +107,7 @@ public sealed class AppDucker
         foreach (var (vol, name) in Sessions())
         {
             if (IsAlwaysSkipped(name) || Exclude.Contains(name, StringComparer.OrdinalIgnoreCase)) continue;
-            try { _held.Add((vol, vol.Volume, name)); } catch { /* ignore */ }
+            try { _held.Add(new Held { Volume = vol, Base = vol.Volume, Name = name }); } catch { /* ignore */ }
         }
 
         // the mixer remembers app volumes forever, so leave a note in case we die while ducked
@@ -117,7 +126,20 @@ public sealed class AppDucker
         double k = Math.Pow(10, offsetDb / 20.0);
         foreach (var h in _held)
         {
-            try { h.Volume.Volume = (float)Math.Clamp(h.Base * k, 0, 1); } catch { /* app closed */ }
+            if (h.LetGo) continue;
+            try
+            {
+                // someone moved this slider in the Windows mixer while we held it: their value wins
+                float current = h.Volume.Volume;
+                if (h.LastSet >= 0 && Math.Abs(current - h.LastSet) > 0.015f)
+                {
+                    h.LetGo = true;
+                    continue;
+                }
+                h.LastSet = (float)Math.Clamp(h.Base * k, 0, 1);
+                h.Volume.Volume = h.LastSet;
+            }
+            catch { /* app closed */ }
         }
     }
 
