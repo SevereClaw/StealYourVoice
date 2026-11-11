@@ -58,11 +58,13 @@ public sealed class MicToast : Window
         };
     }
 
-    public void Flash(bool muted)
+    public void Flash(bool muted) => Flash(muted ? "MIC OFF" : "MIC ON", muted);
+
+    public void Flash(string message, bool red)
     {
-        _text.Text = muted ? "MIC OFF" : "MIC ON";
-        _text.Foreground = muted ? P5.White : P5.Black;
-        _plate.Background = muted ? P5.Red : P5.White;
+        _text.Text = message;
+        _text.Foreground = red ? P5.White : P5.Black;
+        _plate.Background = red ? P5.Red : P5.White;
         _plate.BorderBrush = P5.Black;
 
         BeginAnimation(OpacityProperty, null);

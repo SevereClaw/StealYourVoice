@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using StealYourVoice.Controls;
 
 namespace StealYourVoice;
@@ -31,6 +32,12 @@ public sealed class SpeakersOverlay : Window
     private int _corner = 1;
     private double _offset;
     private Point? _custom;
+    private HashSet<string> _known = new();
+    private readonly Dictionary<string, bool> _talk = new();
+    private readonly Dictionary<string, ScaleTransform> _scales = new();
+    private readonly Dictionary<string, TextBlock> _volLabels = new();
+    private readonly DispatcherTimer _volTimer = new() { Interval = TimeSpan.FromMilliseconds(1400) };
+    private string? _volShownFor;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT { public int Left, Top, Right, Bottom; }
@@ -73,6 +80,57 @@ public sealed class SpeakersOverlay : Window
         Content = _stack;
         SourceInitialized += (_, _) => MiniOverlay.MakeClickThrough(this);
         SizeChanged += (_, _) => Place();
+        _volTimer.Tick += (_, _) =>
+        {
+            _volTimer.Stop();
+            if (_volShownFor != null && _volLabels.TryGetValue(_volShownFor, out var l)) l.Visibility = Visibility.Collapsed;
+            _volShownFor = null;
+        };
+    }
+
+    /// <summary>Which person's row is under this physical screen point?</summary>
+    public string? RowAt(int x, int y)
+    {
+        try
+        {
+            var h = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (h == IntPtr.Zero || !GetWindowRect(h, out var r)) return null;
+            double k = DpiScale;
+            var p = new Point((x - r.Left) / k, (y - r.Top) / k);
+            foreach (var kv in _rows)
+            {
+                if (!kv.Value.IsVisible) continue;
+                var b = kv.Value.TransformToAncestor(this).TransformBounds(new Rect(kv.Value.RenderSize));
+                if (b.Contains(p)) return kv.Key;
+            }
+        }
+        catch { /* layout not ready */ }
+        return null;
+    }
+
+    /// <summary>Briefly show "120%" on a person's row.</summary>
+    public void ShowVolume(string id, int percent)
+    {
+        if (_volShownFor != null && _volShownFor != id && _volLabels.TryGetValue(_volShownFor, out var old))
+            old.Visibility = Visibility.Collapsed;
+        if (!_volLabels.TryGetValue(id, out var label)) return;
+        label.Text = percent + "%";
+        label.Visibility = Visibility.Visible;
+        _volShownFor = id;
+        _volTimer.Stop();
+        _volTimer.Start();
+    }
+
+    private void Bounce(string id)
+    {
+        if (!_scales.TryGetValue(id, out var sc)) return;
+        var a = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(240) };
+        a.KeyFrames.Add(new EasingDoubleKeyFrame(1.14, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(80)),
+            new QuadraticEase { EasingMode = EasingMode.EaseOut }));
+        a.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(240)),
+            new BackEase { Amplitude = 0.6, EasingMode = EasingMode.EaseOut }));
+        sc.BeginAnimation(ScaleTransform.ScaleXProperty, a);
+        sc.BeginAnimation(ScaleTransform.ScaleYProperty, a);
     }
 
     /// <param name="corner">1 = top-left, 2 = top-right, 3 = bottom-left, 4 = bottom-right</param>
@@ -93,12 +151,33 @@ public sealed class SpeakersOverlay : Window
             _stack.Children.Clear();
             _rows.Clear();
             _lit.Clear();
+            _scales.Clear();
+            _volLabels.Clear();
+            _volShownFor = null;
+            var before = _known;
+            _known = new HashSet<string>(members.Select(m => m.Id));
+            foreach (var gone in _talk.Keys.Where(k => !_known.Contains(k)).ToList()) _talk.Remove(gone);
+
             bool right = corner is 2 or 4 && !custom.HasValue;
             foreach (var m in members)
             {
-                var row = BuildRow(m, right, style);
+                var row = BuildRow(m, right, style, out var vol);
+                var sc = new ScaleTransform(1, 1);
+                var tr = new TranslateTransform();
+                row.RenderTransformOrigin = new Point(0.5, 0.5);
+                row.RenderTransform = new TransformGroup { Children = { sc, tr } };
                 _rows[m.Id] = row;
+                _scales[m.Id] = sc;
+                _volLabels[m.Id] = vol;
                 _stack.Children.Add(row);
+
+                // someone new joined → their plate flies in from the screen edge
+                if (before.Count > 0 && !before.Contains(m.Id))
+                    tr.BeginAnimation(TranslateTransform.XProperty,
+                        new DoubleAnimation(right ? 120 : -120, 0, TimeSpan.FromMilliseconds(380))
+                        {
+                            EasingFunction = new BackEase { Amplitude = 0.5, EasingMode = EasingMode.EaseOut }
+                        });
             }
         }
         else if (!moved) return;
@@ -114,6 +193,9 @@ public sealed class SpeakersOverlay : Window
         foreach (var kv in _rows)
         {
             bool on = speaking.Contains(kv.Key);
+            bool talkedBefore = _talk.TryGetValue(kv.Key, out var pt) && pt;
+            _talk[kv.Key] = on;
+            if (on && !talkedBefore) Bounce(kv.Key);
             if (_lit.TryGetValue(kv.Key, out var was) && was == on) continue;
             _lit[kv.Key] = on;
             kv.Value.BorderBrush = on ? P5.Red : P5.White;
@@ -132,8 +214,18 @@ public sealed class SpeakersOverlay : Window
         }
     }
 
-    private static Border BuildRow(SpeakerInfo m, bool right, SpeakerStyle style)
+    private static Border BuildRow(SpeakerInfo m, bool right, SpeakerStyle style, out TextBlock vol)
     {
+        vol = new TextBlock
+        {
+            FontFamily = new FontFamily("Arial Black"),
+            FontSize = 14,
+            Foreground = P5.Red,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(8, 0, 10, 1),
+            Visibility = Visibility.Collapsed
+        };
+
         var name = m.Name.Length > 22 ? m.Name[..20] + "…" : m.Name;
 
         // fallback tile with the first letter, in case the avatar can't be downloaded
@@ -168,9 +260,11 @@ public sealed class SpeakersOverlay : Window
             if (m.Deaf) badges.Children.Add(new StatusIcon(true));
         }
 
-        var row = new DockPanel();
+        var row = new DockPanel { LastChildFill = false };
         DockPanel.SetDock(avatar, Dock.Left);
         row.Children.Add(avatar);
+        DockPanel.SetDock(vol, Dock.Right);
+        row.Children.Add(vol);
 
         if (style.AvatarsOnly)
         {

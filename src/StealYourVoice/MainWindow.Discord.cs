@@ -40,6 +40,9 @@ public partial class MainWindow
     private readonly Dictionary<string, (bool MicOff, bool Deaf)> _dcFlags = new();
     private bool _dcSelfInChannel;
     private MouseHook? _mouseHook;
+    private MicToast? _joinToast;
+    private HashSet<string>? _dcPrevIds;
+    private string? _dcPrevChannel;
     private bool _spkDragging;
     private int _spkDragX, _spkDragY;
     private double _spkStartLeft, _spkStartTop;
@@ -109,6 +112,8 @@ public partial class MainWindow
         SpkTalkOnlyT.IsChecked = _settings.SpeakersOnlyTalking;
         SpkNoNamesT.IsChecked = _settings.SpeakersAvatarsOnly;
         SpkSelfT.IsChecked = _settings.SpeakersShowSelf;
+        SpkJoinT.IsChecked = _settings.JoinLeaveToasts;
+        SpkJoinT.Click += t => { _settings.JoinLeaveToasts = t.IsChecked; _settings.Save(); };
         SpkOpacityS.Value = Math.Round(_settings.SpeakersSilentOpacity * 100);
         SpkScaleS.Value = Math.Round(_settings.SpeakersScale * 100);
         SpkTalkOnlyT.Click += t => { _settings.SpeakersOnlyTalking = t.IsChecked; _settings.Save(); UpdateSpeakers(); };
@@ -146,6 +151,8 @@ public partial class MainWindow
         _dcChannelId = null;
         _dcUserId = null;
         _dcSelfInChannel = false;
+        _dcPrevIds = null;
+        _dcPrevChannel = null;
         _dcApplied.Clear();
         _dcSpeaking.Clear();
         old?.Dispose();
@@ -295,6 +302,8 @@ public partial class MainWindow
             {
                 _dcChannelId = null;
                 _dcSelfInChannel = false;
+                _dcPrevIds = null;
+                _dcPrevChannel = null;
                 _dcSpeaking.Clear();
                 _dcStatus = "ПОДКЛЮЧЕНО // ЗАЙДИ В ГОЛОСОВОЙ КАНАЛ";
                 DcSetFriends(new List<(string, string, int, bool)>());
@@ -363,6 +372,7 @@ public partial class MainWindow
             }
 
             _dcSelfInChannel = selfSeen;
+            DcJoinLeave(channelId, friends.Select(f => f.Id).ToHashSet());
             var chName = DiscordRpc.Str(data, "name");
             _dcStatus = friends.Count == 0
                 ? "В КАНАЛЕ ТОЛЬКО ТЫ"
@@ -427,6 +437,22 @@ public partial class MainWindow
         }
 
         if (msg != MouseHook.WM_LBUTTONDOWN && msg != MouseHook.WM_MOUSEWHEEL) return false;
+
+        // Ctrl + wheel over a person → that person's volume
+        if (msg == MouseHook.WM_MOUSEWHEEL && o != null && o.IsVisible && MouseHook.CtrlDown && !MouseHook.ShiftDown && o.Contains(x, y))
+        {
+            var id = o.RowAt(x, y);
+            if (id == null || id == _dcUserId || !_dcAuthed) return id != null;
+            double current = _dcRows.TryGetValue(id, out var fr) ? fr.Slider.Value : _settings.FriendVolumes.GetValueOrDefault(id, 100);
+            int vol = (int)Math.Clamp(Math.Round(current / 5) * 5 + Math.Sign(delta) * 5, 0, 200);
+            _dcLastTouch = DateTime.Now;
+            _settings.FriendVolumes[id] = vol;
+            _dcSettingsDirty = true;
+            if (fr != null) fr.Slider.Value = vol;
+            DcSetUser(id, vol, null);
+            o.ShowVolume(id, vol);
+            return true;
+        }
         if (o == null || !o.IsVisible || !MouseHook.ShiftDown || !o.Contains(x, y)) return false;
 
         if (msg == MouseHook.WM_LBUTTONDOWN)
@@ -445,6 +471,30 @@ public partial class MainWindow
         SpkScaleS.Value = Math.Round(_settings.SpeakersScale * 100);
         UpdateSpeakers();
         return true;
+    }
+
+    /// <summary>Toast "NAME ЗАШЁЛ / ВЫШЕЛ" when the set of people in the same channel changes.</summary>
+    private void DcJoinLeave(string? channelId, HashSet<string> now)
+    {
+        var prev = _dcPrevIds;
+        bool sameChannel = channelId != null && channelId == _dcPrevChannel;
+        _dcPrevIds = now;
+        _dcPrevChannel = channelId;
+        if (!sameChannel || prev == null || !_settings.JoinLeaveToasts) return;
+
+        var joined = now.Where(id => !prev.Contains(id)).ToList();
+        var left = prev.Where(id => !now.Contains(id)).ToList();
+        if (joined.Count == 0 && left.Count == 0) return;
+
+        bool isJoin = joined.Count > 0;
+        var ids = isJoin ? joined : left;
+        var name = _dcNames.GetValueOrDefault(ids[0], "КТО-ТО");
+        if (name.Length > 16) name = name[..15] + "…";
+        var text = name.ToUpperInvariant() + (ids.Count > 1 ? $" +{ids.Count - 1}" : "") + (isJoin ? " ЗАШЁЛ" : " ВЫШЕЛ");
+
+        _joinToast ??= new MicToast();
+        _joinToast.Flash(text, !isJoin);
+        Audio.Sfx.Play(isJoin ? "confirm" : "cancel");
     }
 
     private static bool DcFlag(JsonElement e, string name) =>

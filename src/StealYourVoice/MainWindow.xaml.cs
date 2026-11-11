@@ -862,6 +862,7 @@ public partial class MainWindow : Window
         _dc?.Dispose();
         _speakers?.Close();
         _mouseHook?.Dispose();
+        _joinToast?.Close();
         if (_tray != null) { _tray.Visible = false; _tray.Dispose(); }
         _vm.Dispose();
         base.OnClosed(e);

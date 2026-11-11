@@ -37,6 +37,7 @@ internal sealed class MouseHook : IDisposable
     private static extern short GetAsyncKeyState(int vk);
 
     public static bool ShiftDown => (GetAsyncKeyState(0x10) & 0x8000) != 0;
+    public static bool CtrlDown => (GetAsyncKeyState(0x11) & 0x8000) != 0;
 
     private readonly HookProc _proc; // keep the delegate alive
     private IntPtr _hook;
