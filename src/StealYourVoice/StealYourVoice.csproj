@@ -12,13 +12,17 @@
     <AssemblyName>StealYourVoice</AssemblyName>
     <RootNamespace>StealYourVoice</RootNamespace>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
-    <Version>0.11.0</Version>
+    <Version>0.12.0</Version>
     <Product>Steal Your Voice</Product>
     <Description>Persona 5 style control panel for Voicemeeter</Description>
   </PropertyGroup>
 
   <ItemGroup>
     <Resource Include="Assets\app.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
   </ItemGroup>
 
 </Project>

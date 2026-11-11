@@ -30,6 +30,7 @@ public partial class MainWindow : Window
     private MicToast? _toast;
     private Audio.Ducker? _ducker;
     private DateTime _lastGameSound = DateTime.MinValue;
+    private readonly Audio.AppDucker _appDucker = new();
     private bool _capturingHotkey;
     private IntPtr _hwnd;
     private const int HotkeyId = 0x5359;
@@ -580,6 +581,9 @@ public partial class MainWindow : Window
     private void InitDucking()
     {
         _ducker = new Audio.Ducker(_vm);
+        Audio.AppDucker.RestoreAfterCrash();
+        UpdateExcludeButton();
+        ExcludeBtn.Click += _ => ShowExcludeMenu();
         DuckT.IsChecked = _settings.DuckEnabled;
         DuckMainT.IsChecked = _settings.DuckMain;
         DuckAuxT.IsChecked = _settings.DuckAux;
@@ -613,6 +617,45 @@ public partial class MainWindow : Window
         };
     }
 
+    private void UpdateExcludeButton() =>
+        ExcludeBtn.Text = "НЕ ГЛУШИТЬ: " + (_settings.DuckExclude.Count == 0 ? "—" : _settings.DuckExclude.Count.ToString());
+
+    private void ShowExcludeMenu()
+    {
+        var menu = new ContextMenu { PlacementTarget = ExcludeBtn, Placement = System.Windows.Controls.Primitives.PlacementMode.Top };
+        menu.Items.Add(new MenuItem { Header = "Отметь программы, которые НЕ надо приглушать:", IsEnabled = false });
+        menu.Items.Add(new Separator());
+
+        var names = Audio.AppDucker.AppsWithSound()
+            .Concat(_settings.DuckExclude)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (names.Count == 0)
+            menu.Items.Add(new MenuItem { Header = "Сейчас ни одна программа не играет звук — включи её и открой меню снова", IsEnabled = false });
+
+        foreach (var n in names)
+        {
+            var name = n;
+            bool Has() => _settings.DuckExclude.Contains(name, StringComparer.OrdinalIgnoreCase);
+            var mi = new MenuItem { Header = (Has() ? "✓  " : "      ") + name, StaysOpenOnClick = true };
+            mi.Click += (_, _) =>
+            {
+                _ducker?.Restore(); // never change the list while something is held down
+                if (Has()) _settings.DuckExclude.RemoveAll(x => string.Equals(x, name, StringComparison.OrdinalIgnoreCase));
+                else _settings.DuckExclude.Add(name);
+                _settings.Save();
+                mi.Header = (Has() ? "✓  " : "      ") + name;
+                UpdateExcludeButton();
+            };
+            menu.Items.Add(mi);
+        }
+
+        menu.Items.Add(new Separator());
+        menu.Items.Add(new MenuItem { Header = "Discord не приглушается никогда. Сними все галочки — вернётся обычный режим.", IsEnabled = false });
+        menu.IsOpen = true;
+    }
+
     private void DuckTick()
     {
         if (_ducker == null) return;
@@ -631,6 +674,17 @@ public partial class MainWindow : Window
         // friends can't duck themselves: with "under friends" on, AUX is never a target
         if (_settings.DuckEnabled && _settings.DuckAux && !friendsOn && _vm.Type != VmType.Standard) targets.Add(hw + 1);
 
+        // with exceptions chosen we duck app by app (Windows mixer) instead of whole Voicemeeter inputs
+        bool perApp = _settings.DuckExclude.Count > 0;
+        if (perApp) targets.Clear();
+        var wantApps = perApp ? _appDucker : null;
+        if (!ReferenceEquals(_ducker.Apps, wantApps))
+        {
+            _ducker.Restore();
+            _ducker.Apps = wantApps;
+        }
+        _appDucker.Exclude = _settings.DuckExclude;
+
         // post-mute level: a muted mic never ducks the game
         var (l, r) = _vm.StripChannels(_strip, 2);
         var micDb = P5.ToDb(Math.Max(l, r));
@@ -645,9 +699,9 @@ public partial class MainWindow : Window
             gameDb = Math.Max(gameDb, P5.ToDb(Math.Max(gl, gr)));
         }
         if (gameDb > -70) _lastGameSound = DateTime.Now;
-        bool noGame = (DateTime.Now - _lastGameSound).TotalSeconds > 3;
+        bool noGame = !perApp && (DateTime.Now - _lastGameSound).TotalSeconds > 3;
 
-        if (targets.Count == 0)
+        if (targets.Count == 0 && !perApp)
         {
             DuckState.Text = "ВЫБЕРИ, ЧТО ПРИГЛУШАТЬ";
             DuckState.Foreground = P5.Grey;

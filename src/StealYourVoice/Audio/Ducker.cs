@@ -5,8 +5,8 @@ using StealYourVoice.Voicemeeter;
 namespace StealYourVoice.Audio;
 
 /// <summary>
-/// Sidechain "ducking": while you talk, lowers the gain of the chosen Voicemeeter
-/// virtual inputs (game / music), then smoothly brings it back.
+/// Sidechain "ducking": while a trigger is active, lowers either the chosen Voicemeeter
+/// virtual inputs or individual apps (see <see cref="Apps"/>), then smoothly brings them back.
 /// </summary>
 public sealed class Ducker
 {
@@ -14,20 +14,23 @@ public sealed class Ducker
     private readonly Dictionary<int, float> _base = new();
     private readonly List<int> _targets = new();
     private DateTime _lastVoice = DateTime.MinValue;
+    private bool _held;
 
-    private const double HoldMs = 450;       // keep ducked a bit after the last word
+    private const double HoldMs = 450;        // keep ducked a bit after the last word
     private const double AttackPerTick = 4.0; // dB per 33 ms tick
     private const double ReleasePerTick = 0.6;
 
-    public double Offset { get; private set; } // 0 .. Amount (negative)
+    public double Offset { get; private set; } // 0 .. amount (negative)
     public bool Active => Offset < -0.05;
+
+    /// <summary>When set, apps are ducked one by one through the Windows mixer (with exceptions).</summary>
+    public AppDucker? Apps { get; set; }
 
     public Ducker(VmClient vm) { _vm = vm; }
 
-    /// <param name="micDb">mic level after mute (dB)</param>
-    /// <param name="targets">strip indexes to duck</param>
+    /// <param name="voice">is the trigger (you / friends) talking right now</param>
+    /// <param name="targets">Voicemeeter strip indexes to duck</param>
     /// <param name="amount">negative dB, e.g. -12</param>
-    /// <param name="threshold">voice threshold in dB</param>
     public void Tick(bool voice, IReadOnlyList<int> targets, double amount)
     {
         if (!SameTargets(targets))
@@ -36,7 +39,7 @@ public sealed class Ducker
             _targets.Clear();
             _targets.AddRange(targets);
         }
-        if (_targets.Count == 0) return;
+        if (_targets.Count == 0 && Apps == null) return;
 
         var now = DateTime.Now;
         if (voice) _lastVoice = now;
@@ -45,8 +48,8 @@ public sealed class Ducker
 
         if (Math.Abs(goal - Offset) < 0.01) return;
 
-        // starting to duck from rest: remember the user's gains
-        if (!Active && goal < 0) CaptureBase();
+        // starting to duck from rest: remember the user's own levels
+        if (!_held && goal < 0) Capture();
 
         Offset = goal < Offset
             ? Math.Max(goal, Offset - AttackPerTick)
@@ -54,27 +57,38 @@ public sealed class Ducker
         if (Math.Abs(Offset) < 0.05) Offset = 0;
 
         Apply();
+        if (Offset == 0) Release();
     }
 
-    /// <summary>Put the gains back immediately (disable / exit / target change).</summary>
+    /// <summary>Put everything back immediately (disable / exit / mode change).</summary>
     public void Restore()
     {
-        if (Offset == 0 && _base.Count == 0) return;
+        if (!_held && Offset == 0) return;
         Offset = 0;
         Apply();
-        _base.Clear();
+        Release();
     }
 
-    private void CaptureBase()
+    private void Capture()
     {
+        _held = true;
         _base.Clear();
         foreach (var t in _targets) _base[t] = _vm.Get($"Strip[{t}].Gain");
+        Apps?.Capture();
     }
 
     private void Apply()
     {
         foreach (var kv in _base)
             _vm.Set($"Strip[{kv.Key}].Gain", (float)Math.Clamp(kv.Value + Offset, -60, 12));
+        Apps?.Apply(Offset);
+    }
+
+    private void Release()
+    {
+        _held = false;
+        _base.Clear();
+        Apps?.Release();
     }
 
     private bool SameTargets(IReadOnlyList<int> t)

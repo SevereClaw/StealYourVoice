@@ -40,6 +40,8 @@ public sealed class Settings
     public bool DuckAux { get; set; }           // "Voicemeeter AUX" virtual strip
     public double DuckAmount { get; set; } = -12;
     public double DuckThreshold { get; set; } = -40;
+    /// <summary>Programs that must NOT be ducked. Non-empty = duck app by app instead of whole Voicemeeter inputs.</summary>
+    public List<string> DuckExclude { get; set; } = new();
     public bool DuckFriends { get; set; }       // duck the game while Discord (AUX) is talking
 
     /// <summary>Corner mic indicator: 0 = off, 1..4 = TL, TR, BL, BR.</summary>

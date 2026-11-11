@@ -190,6 +190,8 @@
                                            Hint="Приглушать виртуальный вход «Voicemeeter Input» (обычно туда идёт весь звук Windows / игра)" />
                             <c:SlashToggle x:Name="DuckAuxT" Text="AUX" FontSize="13" Height="32" Tilt="1"
                                            Hint="Приглушать виртуальный вход «Voicemeeter AUX» (например, музыка или Discord)" />
+                            <c:SlashToggle x:Name="ExcludeBtn" Text="НЕ ГЛУШИТЬ: —" IsToggle="False" FontSize="13" Height="32" Tilt="-1"
+                                           Hint="Выбрать программы, которые не приглушаются (например, музыка). Пока выбрана хоть одна, глушится каждая программа отдельно через микшер Windows, а не весь вход Voicemeeter" />
                             <c:SlashToggle x:Name="GameToB2T" Text="ИГРА → КЛИПЫ (B2)" FontSize="13" Height="32"
                                            Hint="Звук компьютера (уже приглушённый) + твой голос уходят в шину B2 — только для ShadowPlay. В Discord (B1) остаётся только голос. В ShadowPlay: микрофон = Voicemeeter Out B2, «Системные звуки» = 0%" />
                         </WrapPanel>
