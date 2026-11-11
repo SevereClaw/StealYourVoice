@@ -24,6 +24,14 @@ public partial class MainWindow
 
     private void InitExtras()
     {
+        // overall loudness: computer sound (Voicemeeter Input) and the headphones bus (A1)
+        GameGainS.ValueChanged += v =>
+        {
+            _ducker?.Restore(); // otherwise a duck in progress would put the old level back
+            _vm.Set($"Strip[{_vm.HardwareStrips}].Gain", (float)v);
+        };
+        PhonesGainS.ValueChanged += v => _vm.Set("Bus[0].Gain", (float)v);
+
         // Discord / AUX
         AuxGainS.ValueChanged += v => _vm.Set($"Strip[{AuxStrip}].Gain", (float)v);
         DuckFriendsT.IsChecked = _settings.DuckFriends;
@@ -104,6 +112,11 @@ public partial class MainWindow
 
     private void RefreshExtras()
     {
+        // while ducking lowers the game, the gain we'd read is the temporary one
+        bool gameDucked = _ducker is { Active: true, Apps: null };
+        if (!gameDucked && !GameGainS.IsDragging) GameGainS.Value = _vm.Get($"Strip[{_vm.HardwareStrips}].Gain");
+        if (!PhonesGainS.IsDragging) PhonesGainS.Value = _vm.Get("Bus[0].Gain");
+
         bool hasAux = _vm.Type != Voicemeeter.VmType.Standard;
         DiscordPanel.Visibility = hasAux ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
         if (!hasAux) return;

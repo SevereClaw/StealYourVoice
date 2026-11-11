@@ -131,6 +131,21 @@
                                            Bipolar="True" Hint="Влево — теплее, вправо — ярче и разборчивее" />
                         </Grid>
 
+                        <TextBlock Style="{StaticResource SubHeader}" Text="ГРОМКОСТЬ" Margin="0,12,0,6" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="24" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <c:SlashSlider x:Name="GameGainS" Grid.Column="0" Label="ИГРА / КОМПЬЮТЕР"
+                                           Minimum="-60" Maximum="12" Default="0" Step="0.5" Unit=" dB"
+                                           Hint="Громкость всего, что играет через Voicemeeter Input (игра, браузер, музыка). Выше 0 — усиление, до +12 dB. Двойной клик — 0 dB" />
+                            <c:SlashSlider x:Name="PhonesGainS" Grid.Column="2" Label="НАУШНИКИ (ВСЁ)"
+                                           Minimum="-60" Maximum="12" Default="0" Step="0.5" Unit=" dB"
+                                           Hint="Общая громкость выхода A1: игра, друзья и всё остальное разом. Выше 0 — усиление, до +12 dB. Двойной клик — 0 dB" />
+                        </Grid>
+
                         <StackPanel x:Name="DiscordPanel">
                             <DockPanel Margin="0,12,0,6">
                                 <TextBlock x:Name="DiscordState" DockPanel.Dock="Right" Text="ТИШИНА" Foreground="#808080"
