@@ -4,7 +4,7 @@
         xmlns:c="clr-namespace:StealYourVoice.Controls"
         Title="Steal Your Voice"
         Icon="Assets/app.ico"
-        Width="1040" Height="860"
+        Width="1040" SizeToContent="Height"
         WindowStyle="None" ResizeMode="CanMinimize"
         WindowStartupLocation="CenterScreen"
         Background="#0A0A0A"
@@ -42,7 +42,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
