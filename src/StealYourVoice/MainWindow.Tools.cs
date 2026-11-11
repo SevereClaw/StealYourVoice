@@ -236,6 +236,38 @@ public partial class MainWindow
                 "ГОЛОС В B2", () => _vm.Set(S("B2"), 1));
         }
 
+        // ── Discord routing: friends must be audible to you, but stay out of clips unless asked ──
+        if (_vm.Type != VmType.Standard)
+        {
+            int aux = _vm.HardwareStrips + 1;
+            if (_vm.Get($"Strip[{aux}].A1") < 0.5f)
+            {
+                Count(Sev.Warn);
+                AddRow(Sev.Warn, "Вход AUX (туда должен играть Discord) не выведен в наушники: друзей не будет слышно.",
+                    "ВКЛЮЧИТЬ A1", () => _vm.Set($"Strip[{aux}].A1", 1));
+            }
+
+            if (_vm.Get($"Strip[{aux}].B2") >= 0.5f)
+                AddRow(Sev.Info, "Голоса друзей пишутся в клипы (вход AUX идёт в B2). Если это не нужно — убери.",
+                    "НЕ ПИСАТЬ ДРУЗЕЙ", () => _vm.Set($"Strip[{aux}].B2", 0));
+
+            if (_dcAuthed && _dcOutputName != null)
+            {
+                if (_dcOutputName.Contains("AUX", StringComparison.OrdinalIgnoreCase))
+                    AddRow(Sev.Ok, "Discord играет в Voicemeeter AUX Input: друзья идут отдельно от игры.");
+                else
+                {
+                    Count(Sev.Warn);
+                    AddRow(Sev.Warn, $"Discord играет в «{_dcOutputName}», а не в «Voicemeeter AUX Input». Друзья смешаны с игрой, " +
+                                     "поэтому попадают в клипы, а их громкость нельзя менять отдельно. " +
+                                     "Discord → Настройки → Голос и видео → Устройство вывода → Voicemeeter AUX Input.");
+                }
+            }
+            else
+                AddRow(Sev.Info, "Не могу проверить сам: в Discord → Голос и видео устройство вывода должно быть " +
+                                 "«Voicemeeter AUX Input», иначе друзья попадают в клипы вместе с игрой.");
+        }
+
         // ── signal ──
         if (!rep.HeardVoice)
         {

@@ -137,9 +137,12 @@
                                            FontFamily="Arial Black" FontSize="12" VerticalAlignment="Bottom" Margin="0,0,4,3" />
                                 <TextBlock Style="{StaticResource SubHeader}" DockPanel.Dock="Left" Text="DISCORD // AUX" Margin="0"
                                            ToolTip="В Discord поставь устройство вывода «Voicemeeter AUX Input» — тогда голоса друзей идут отдельно от игры" />
-                                <c:SlashToggle x:Name="FriendsBtn" Text="ДРУЗЬЯ" IsToggle="False" Sound="" FontSize="12" Height="28"
-                                               HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="14,0,0,0"
+                                <c:SlashToggle x:Name="FriendsBtn" DockPanel.Dock="Left" Text="ДРУЗЬЯ" IsToggle="False" Sound="" FontSize="12" Height="28"
+                                               VerticalAlignment="Bottom" Margin="14,0,0,0"
                                                Hint="Громкость каждого человека в голосовом канале отдельно" />
+                                <c:SlashToggle x:Name="FriendsClipsT" Text="В КЛИПЫ" FontSize="12" Height="28"
+                                               HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10,0,0,0"
+                                               Hint="Записывать голоса друзей в клипы ShadowPlay. Выключено — в клипах только игра и ты. Работает через шину B2: в ShadowPlay микрофон = Voicemeeter Out B2, «Системные звуки» = 0%" />
                             </DockPanel>
                             <Grid>
                                 <Grid.ColumnDefinitions>

@@ -41,6 +41,8 @@ public partial class MainWindow
     private bool _dcSelfInChannel;
     private MouseHook? _mouseHook;
     private MicToast? _joinToast;
+    private string? _dcOutputName;
+    private int _dcPollCount;
     private HashSet<string>? _dcPrevIds;
     private string? _dcPrevChannel;
     private bool _spkDragging;
@@ -151,6 +153,8 @@ public partial class MainWindow
         _dcChannelId = null;
         _dcUserId = null;
         _dcSelfInChannel = false;
+        _dcOutputName = null;
+        _dcPollCount = 0;
         _dcPrevIds = null;
         _dcPrevChannel = null;
         _dcApplied.Clear();
@@ -295,6 +299,14 @@ public partial class MainWindow
         _dcPolling = true;
         try
         {
+            // now and then: which device does Discord play into? (diagnostics uses it)
+            if (_dcPollCount++ % 5 == 0)
+            {
+                try { _dcOutputName = DcOutputDevice(await dc.Command("GET_VOICE_SETTINGS", new Dictionary<string, object>())); }
+                catch { /* optional */ }
+                if (_dc != dc) return;
+            }
+
             var data = await dc.Command("GET_SELECTED_VOICE_CHANNEL", new Dictionary<string, object>());
             if (_dc != dc) return;
 
@@ -495,6 +507,17 @@ public partial class MainWindow
         _joinToast ??= new MicToast();
         _joinToast.Flash(text, !isJoin);
         Audio.Sfx.Play(isJoin ? "confirm" : "cancel");
+    }
+
+    private static string? DcOutputDevice(JsonElement settings)
+    {
+        if (settings.ValueKind != JsonValueKind.Object || !settings.TryGetProperty("output", out var o)) return null;
+        var id = DiscordRpc.Str(o, "device_id");
+        if (id == null) return null;
+        if (o.TryGetProperty("available_devices", out var devs) && devs.ValueKind == JsonValueKind.Array)
+            foreach (var d in devs.EnumerateArray())
+                if (DiscordRpc.Str(d, "id") == id) return DiscordRpc.Str(d, "name") ?? id;
+        return id;
     }
 
     private static bool DcFlag(JsonElement e, string name) =>

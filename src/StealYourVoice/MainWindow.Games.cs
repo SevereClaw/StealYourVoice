@@ -34,6 +34,23 @@ public partial class MainWindow
             if (!t.IsChecked && !_settings.DuckEnabled) _ducker?.Restore();
         };
 
+        // friends' voices into clips (B2) — off by default so recordings stay friend-free
+        FriendsClipsT.Click += t =>
+        {
+            int vin = _vm.HardwareStrips;
+            if (t.IsChecked)
+            {
+                // clips are mixed on B2: game + you + friends; Discord (B1) still gets only your voice
+                _vm.Script($"Strip[{AuxStrip}].B2=1;Strip[{AuxStrip}].B1=0;Strip[{vin}].B2=1;Strip[{vin}].B1=0;{S("B2")}=1;");
+                StatusText.Text = "ДРУЗЬЯ В КЛИПАХ // SHADOWPLAY: МИКРОФОН = OUT B2, СИСТЕМНЫЕ ЗВУКИ = 0%";
+            }
+            else
+            {
+                _vm.Script($"Strip[{AuxStrip}].B2=0;");
+                StatusText.Text = "ДРУЗЬЯ НЕ ПИШУТСЯ В КЛИПЫ";
+            }
+        };
+
         // corner indicator
         _settings.OverlayCorner = Math.Clamp(_settings.OverlayCorner, 0, 4);
         OverlayBtn.Click += _ =>
@@ -89,6 +106,7 @@ public partial class MainWindow
         bool hasAux = _vm.Type != Voicemeeter.VmType.Standard;
         DiscordPanel.Visibility = hasAux ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
         if (!hasAux) return;
+        FriendsClipsT.IsChecked = _vm.Get($"Strip[{AuxStrip}].B2") >= 0.5f;
         // while ducking lowers AUX, the gain we'd read is the temporary one
         bool auxDucked = _ducker is { Active: true } && _settings.DuckEnabled && _settings.DuckAux && !_settings.DuckFriends;
         if (!auxDucked && !AuxGainS.IsDragging) AuxGainS.Value = _vm.Get($"Strip[{AuxStrip}].Gain");
