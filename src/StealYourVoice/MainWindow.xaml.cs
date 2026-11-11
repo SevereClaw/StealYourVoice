@@ -156,6 +156,7 @@ public partial class MainWindow : Window
     {
         _tick++;
         DiscordTick();
+        if (_tick % 150 == 0) SyncVolumeKeys();
 
         if (!_vm.IsConnected)
         {
@@ -185,6 +186,7 @@ public partial class MainWindow : Window
     {
         if (_strip >= _vm.HardwareStrips) _strip = 0;
         Audio.Ducker.RestoreAfterCrash(_vm);
+        SyncVolumeKeys();
         BuildStripButtons();
         RefreshParams();
         Offline.Visibility = Visibility.Collapsed;
@@ -549,6 +551,7 @@ public partial class MainWindow : Window
             ToggleMute();
             handled = true;
         }
+        else if (msg == WM_HOTKEY && OnVolumeKey(wParam.ToInt32())) handled = true;
         return IntPtr.Zero;
     }
 
@@ -915,6 +918,8 @@ public partial class MainWindow : Window
         _ducker?.Restore();
         if (_hwnd != IntPtr.Zero) UnregisterHotKey(_hwnd, HotkeyId);
         _toast?.Close();
+        ReleaseVolumeKeys();
+        _volToast?.Close();
         _overlay?.Close();
         _dc?.Dispose();
         _speakers?.Close();

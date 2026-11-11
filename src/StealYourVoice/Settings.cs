@@ -34,6 +34,9 @@ public sealed class Settings
     public bool ShowToast { get; set; } = true;
     public bool SoundsEnabled { get; set; } = true;
 
+    /// <summary>Keyboard volume keys drive the Voicemeeter headphones bus (A1) while Voicemeeter is the default device.</summary>
+    public bool VolumeKeys { get; set; } = true;
+
     // auto-ducking
     public bool DuckEnabled { get; set; }
     public bool DuckMain { get; set; } = true;  // "Voicemeeter Input" virtual strip

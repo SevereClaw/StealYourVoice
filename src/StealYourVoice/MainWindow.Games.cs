@@ -22,8 +22,84 @@ public partial class MainWindow
 
     private int AuxStrip => _vm.HardwareStrips + 1;
 
+    // ───────────────────────── keyboard volume keys → headphones bus ─────────────────────────
+
+    private bool _volKeysOn;
+    private MicToast? _volToast;
+    private const int VolUpId = 0x5360, VolDownId = 0x5361, VolMuteId = 0x5362;
+
+    private static bool DefaultOutputIsVoicemeeter()
+    {
+        try
+        {
+            using var en = new NAudio.CoreAudioApi.MMDeviceEnumerator();
+            using var dev = en.GetDefaultAudioEndpoint(NAudio.CoreAudioApi.DataFlow.Render, NAudio.CoreAudioApi.Role.Multimedia);
+            return dev.FriendlyName.Contains("Voicemeeter", StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// With Voicemeeter as the default device, Windows' own volume barely does anything,
+    /// so we take the volume keys over — but only then, and only while Voicemeeter is running.
+    /// </summary>
+    private void SyncVolumeKeys()
+    {
+        if (_hwnd == IntPtr.Zero) return;
+        bool want = _settings.VolumeKeys && _vm.IsConnected && DefaultOutputIsVoicemeeter();
+        if (want == _volKeysOn) return;
+        if (want)
+        {
+            RegisterHotKey(_hwnd, VolUpId, 0, 0xAF);
+            RegisterHotKey(_hwnd, VolDownId, 0, 0xAE);
+            RegisterHotKey(_hwnd, VolMuteId, 0, 0xAD);
+        }
+        else ReleaseVolumeKeys();
+        _volKeysOn = want;
+    }
+
+    private void ReleaseVolumeKeys()
+    {
+        if (_hwnd == IntPtr.Zero) return;
+        UnregisterHotKey(_hwnd, VolUpId);
+        UnregisterHotKey(_hwnd, VolDownId);
+        UnregisterHotKey(_hwnd, VolMuteId);
+        _volKeysOn = false;
+    }
+
+    private bool OnVolumeKey(int id)
+    {
+        if (id != VolUpId && id != VolDownId && id != VolMuteId) return false;
+        if (!_vm.IsConnected) return true;
+
+        bool muted = _vm.Get("Bus[0].Mute") >= 0.5f;
+        string text;
+        if (id == VolMuteId)
+        {
+            _vm.Set("Bus[0].Mute", muted ? 0 : 1);
+            text = muted ? "ЗВУК ВКЛ" : "ЗВУК ВЫКЛ";
+            muted = !muted;
+        }
+        else
+        {
+            if (muted) { _vm.Set("Bus[0].Mute", 0); muted = false; }
+            double g = Math.Round(_vm.Get("Bus[0].Gain") / 2.0) * 2 + (id == VolUpId ? 2 : -2);
+            g = Math.Clamp(g, -60, 12);
+            _vm.Set("Bus[0].Gain", (float)g);
+            if (!PhonesGainS.IsDragging) PhonesGainS.Value = g;
+            text = $"ГРОМКОСТЬ {g:+0;-0;0} dB";
+        }
+
+        _volToast ??= new MicToast();
+        _volToast.Flash(text, muted);
+        return true;
+    }
+
     private void InitExtras()
     {
+        VolKeysT.IsChecked = _settings.VolumeKeys;
+        VolKeysT.Click += t => { _settings.VolumeKeys = t.IsChecked; _settings.Save(); SyncVolumeKeys(); };
+
         // overall loudness: computer sound (Voicemeeter Input) and the headphones bus (A1)
         GameGainS.ValueChanged += v =>
         {

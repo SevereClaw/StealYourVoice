@@ -235,6 +235,8 @@
                                    Hint="Показывать «MIC OFF / MIC ON» поверх экрана при переключении" />
                     <c:SlashToggle x:Name="OverlayBtn" IsToggle="False" Text="ИНДИКАТОР: ВЫКЛ" FontSize="12" Height="32" Tilt="-1"
                                    Hint="Маленькая полоска уровня микрофона и значок MIC OFF в углу экрана поверх игры. Каждое нажатие — следующий угол" />
+                    <c:SlashToggle x:Name="VolKeysT" Text="КЛАВИШИ ГРОМКОСТИ" FontSize="12" Height="32" Tilt="1"
+                                   Hint="Клавиши громкости на клавиатуре (тише / громче / без звука) управляют громкостью наушников в Voicemeeter. Работает, пока звук Windows идёт через Voicemeeter" />
                     <c:SlashToggle x:Name="ShowVmBtn" Text="VOICEMEETER" IsToggle="False" FontSize="12" Height="32"
                                    Hint="Открыть окно Voicemeeter" />
                     <c:SlashToggle x:Name="RestartBtn" Text="РЕСТАРТ ЗВУКА" IsToggle="False" FontSize="12" Height="32" Tilt="-1"
