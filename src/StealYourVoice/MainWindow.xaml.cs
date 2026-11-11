@@ -82,6 +82,7 @@ public partial class MainWindow : Window
         InitDucking();
         InitFx();
         InitExtras();
+        InitDiscord();
 
         // presets
         BuildPresets();
@@ -153,6 +154,7 @@ public partial class MainWindow : Window
     private void OnTick(object? sender, EventArgs e)
     {
         _tick++;
+        DiscordTick();
 
         if (!_vm.IsConnected)
         {
@@ -479,7 +481,7 @@ public partial class MainWindow : Window
     {
         if (!_capturingHotkey)
         {
-            if ((e.Key == Key.Enter || e.Key == Key.Space) && e.OriginalSource is not TextBox) e.Handled = true;
+            if ((e.Key == Key.Enter || e.Key == Key.Space) && e.OriginalSource is not TextBox && e.OriginalSource is not PasswordBox) e.Handled = true;
             return;
         }
         e.Handled = true;
@@ -856,6 +858,7 @@ public partial class MainWindow : Window
         if (_hwnd != IntPtr.Zero) UnregisterHotKey(_hwnd, HotkeyId);
         _toast?.Close();
         _overlay?.Close();
+        _dc?.Dispose();
         if (_tray != null) { _tray.Visible = false; _tray.Dispose(); }
         _vm.Dispose();
         base.OnClosed(e);

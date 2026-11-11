@@ -135,8 +135,11 @@
                             <DockPanel Margin="0,12,0,6">
                                 <TextBlock x:Name="DiscordState" DockPanel.Dock="Right" Text="ТИШИНА" Foreground="#808080"
                                            FontFamily="Arial Black" FontSize="12" VerticalAlignment="Bottom" Margin="0,0,4,3" />
-                                <TextBlock Style="{StaticResource SubHeader}" Text="DISCORD // AUX" Margin="0"
+                                <TextBlock Style="{StaticResource SubHeader}" DockPanel.Dock="Left" Text="DISCORD // AUX" Margin="0"
                                            ToolTip="В Discord поставь устройство вывода «Voicemeeter AUX Input» — тогда голоса друзей идут отдельно от игры" />
+                                <c:SlashToggle x:Name="FriendsBtn" Text="ДРУЗЬЯ" IsToggle="False" Sound="" FontSize="12" Height="28"
+                                               HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="14,0,0,0"
+                                               Hint="Громкость каждого человека в голосовом канале отдельно" />
                             </DockPanel>
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -249,6 +252,51 @@
                         <StackPanel x:Name="ToolBody" />
                     </ScrollViewer>
                     <WrapPanel x:Name="ToolButtons" Margin="0,14,0,0" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Discord friends overlay -->
+        <Grid x:Name="FriendsOverlay" Background="#E80A0A0A" Visibility="Collapsed">
+            <Border Background="#0A0A0A" BorderBrush="#F5F5F5" BorderThickness="3" Padding="28,18,28,20" Width="720"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                <Border.RenderTransform>
+                    <RotateTransform Angle="1" />
+                </Border.RenderTransform>
+                <StackPanel>
+                    <TextBlock Style="{StaticResource Header}" Text="ДРУЗЬЯ В DISCORD" />
+                    <TextBlock x:Name="DcStatusText" Foreground="#E60012" FontFamily="Arial Black" FontStyle="Italic" FontSize="16"
+                               Margin="0,2,0,12" TextWrapping="Wrap" />
+
+                    <StackPanel x:Name="DcSetupPanel">
+                        <TextBlock Foreground="#C8C8C8" FontSize="13" TextWrapping="Wrap" Margin="2,0,0,12">
+                            Один раз нужно создать своё приложение в Discord:<LineBreak />
+                            1. Нажми «ОТКРЫТЬ ПОРТАЛ» → New Application → любое имя.<LineBreak />
+                            2. Слева вкладка OAuth2: скопируй CLIENT ID. Нажми Reset Secret и скопируй CLIENT SECRET.<LineBreak />
+                            3. Там же в Redirects добавь адрес http://localhost и нажми Save Changes.<LineBreak />
+                            4. Вставь оба значения сюда, нажми «ПОДКЛЮЧИТЬ» и в окне Discord — «Авторизовать».
+                        </TextBlock>
+                        <TextBlock Text="CLIENT ID" Foreground="#9A9A9A" FontFamily="Arial Black" FontSize="12" Margin="2,0,0,4" />
+                        <TextBox x:Name="DcIdBox" MaxLength="32" FontFamily="Consolas" FontSize="16"
+                                 Background="#1A1A1A" Foreground="#F5F5F5" CaretBrush="#F5F5F5" SelectionBrush="#E60012"
+                                 BorderBrush="#E60012" BorderThickness="3" Padding="10,6" Margin="0,0,0,10" />
+                        <TextBlock x:Name="DcSecretHint" Text="CLIENT SECRET" Foreground="#9A9A9A" FontFamily="Arial Black" FontSize="12" Margin="2,0,0,4" />
+                        <PasswordBox x:Name="DcSecretBox" MaxLength="64" FontFamily="Consolas" FontSize="16"
+                                     Background="#1A1A1A" Foreground="#F5F5F5" CaretBrush="#F5F5F5" SelectionBrush="#E60012"
+                                     BorderBrush="#E60012" BorderThickness="3" Padding="10,6" Margin="0,0,0,4" />
+                    </StackPanel>
+
+                    <ScrollViewer MaxHeight="420" VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="DcFriendsPanel" Margin="0,0,10,0" />
+                    </ScrollViewer>
+
+                    <WrapPanel Margin="0,14,0,0">
+                        <c:SlashToggle x:Name="DcConnectBtn" Text="ПОДКЛЮЧИТЬ" IsToggle="False" Sound="" Height="40" FontSize="15" />
+                        <c:SlashToggle x:Name="DcPortalBtn" Text="ОТКРЫТЬ ПОРТАЛ" IsToggle="False" Height="40" FontSize="15" />
+                        <c:SlashToggle x:Name="DcForgetBtn" Text="СБРОСИТЬ КЛЮЧИ" IsToggle="False" Sound="cancel" Height="40" FontSize="15"
+                                       Hint="Отключиться от Discord и удалить сохранённые ID, secret и разрешение" />
+                        <c:SlashToggle x:Name="DcCloseBtn" Text="ЗАКРЫТЬ" IsToggle="False" Sound="cancel" Height="40" FontSize="15" />
+                    </WrapPanel>
                 </StackPanel>
             </Border>
         </Grid>

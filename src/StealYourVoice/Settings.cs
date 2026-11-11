@@ -47,6 +47,14 @@ public sealed class Settings
 
     public List<UserPreset> Presets { get; set; } = new();
 
+    // Discord per-friend volume (secret and tokens are DPAPI-encrypted)
+    public string DiscordClientId { get; set; } = "";
+    public string DiscordSecretEnc { get; set; } = "";
+    public string DiscordAccessEnc { get; set; } = "";
+    public string DiscordRefreshEnc { get; set; } = "";
+    public DateTime DiscordTokenExpires { get; set; }
+    public Dictionary<string, int> FriendVolumes { get; set; } = new();
+
     private static readonly string Dir =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StealYourVoice");
     private static readonly string FilePath = Path.Combine(Dir, "settings.json");
