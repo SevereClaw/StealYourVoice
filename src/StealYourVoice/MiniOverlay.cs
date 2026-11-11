@@ -45,6 +45,16 @@ public sealed class MiniOverlay : Window
         };
     }
 
+    /// <summary>Click-through, never takes focus, hidden from Alt+Tab. Call after the handle exists.</summary>
+    public static void MakeClickThrough(Window w)
+    {
+        const int GWL_EXSTYLE = -20;
+        const long WS_EX_TRANSPARENT = 0x20, WS_EX_TOOLWINDOW = 0x80, WS_EX_NOACTIVATE = 0x08000000;
+        var h = new WindowInteropHelper(w).Handle;
+        var ex = GetWindowLongPtr(h, GWL_EXSTYLE).ToInt64();
+        SetWindowLongPtr(h, GWL_EXSTYLE, new IntPtr(ex | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE));
+    }
+
     /// <param name="corner">1 = top-left, 2 = top-right, 3 = bottom-left, 4 = bottom-right</param>
     public void Place(int corner)
     {

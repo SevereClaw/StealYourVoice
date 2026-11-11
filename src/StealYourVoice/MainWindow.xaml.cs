@@ -859,6 +859,7 @@ public partial class MainWindow : Window
         _toast?.Close();
         _overlay?.Close();
         _dc?.Dispose();
+        _speakers?.Close();
         if (_tray != null) { _tray.Visible = false; _tray.Dispose(); }
         _vm.Dispose();
         base.OnClosed(e);

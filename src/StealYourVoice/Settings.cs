@@ -55,6 +55,9 @@ public sealed class Settings
     public DateTime DiscordTokenExpires { get; set; }
     public Dictionary<string, int> FriendVolumes { get; set; } = new();
 
+    /// <summary>"Who is talking" overlay: 0 = off, 1..4 = TL, TR, BL, BR.</summary>
+    public int SpeakersCorner { get; set; }
+
     private static readonly string Dir =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StealYourVoice");
     private static readonly string FilePath = Path.Combine(Dir, "settings.json");

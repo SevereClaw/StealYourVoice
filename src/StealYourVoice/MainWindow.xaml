@@ -295,6 +295,8 @@
                         <c:SlashToggle x:Name="DcPortalBtn" Text="ОТКРЫТЬ ПОРТАЛ" IsToggle="False" Height="40" FontSize="15" />
                         <c:SlashToggle x:Name="DcForgetBtn" Text="СБРОСИТЬ КЛЮЧИ" IsToggle="False" Sound="cancel" Height="40" FontSize="15"
                                        Hint="Отключиться от Discord и удалить сохранённые ID, secret и разрешение" />
+                        <c:SlashToggle x:Name="SpeakersBtn" Text="КТО ГОВОРИТ: ВЫКЛ" IsToggle="False" Height="40" FontSize="15"
+                                       Hint="Поверх игры показывать имена тех, кто сейчас говорит в Discord. Каждое нажатие — следующий угол экрана" />
                         <c:SlashToggle x:Name="DcCloseBtn" Text="ЗАКРЫТЬ" IsToggle="False" Sound="cancel" Height="40" FontSize="15" />
                     </WrapPanel>
                 </StackPanel>

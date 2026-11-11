@@ -34,6 +34,8 @@ public partial class MainWindow
     private readonly Dictionary<string, FriendRow> _dcRows = new();
     private readonly HashSet<string> _dcApplied = new();
     private readonly HashSet<string> _dcSpeaking = new();
+    private readonly Dictionary<string, string> _dcNames = new();
+    private SpeakersOverlay? _speakers;
 
     private bool DcConfigured =>
         !string.IsNullOrWhiteSpace(_settings.DiscordClientId) && !string.IsNullOrEmpty(_settings.DiscordSecretEnc);
@@ -83,6 +85,15 @@ public partial class MainWindow
             DcIdBox.Text = "";
             _dcStatus = "КЛЮЧИ УДАЛЕНЫ";
             DcRender();
+        };
+        _settings.SpeakersCorner = Math.Clamp(_settings.SpeakersCorner, 0, 4);
+        SpeakersBtn.Text = "КТО ГОВОРИТ: " + CornerNames[_settings.SpeakersCorner];
+        SpeakersBtn.Click += _ =>
+        {
+            _settings.SpeakersCorner = (_settings.SpeakersCorner + 1) % 5;
+            _settings.Save();
+            SpeakersBtn.Text = "КТО ГОВОРИТ: " + CornerNames[_settings.SpeakersCorner];
+            UpdateSpeakers();
         };
         _dcStatus = DcConfigured ? "ПОДКЛЮЧАЮСЬ..." : "НЕ НАСТРОЕНО";
         DcRender();
@@ -304,6 +315,7 @@ public partial class MainWindow
                         DcSetUser(id, saved, null);
                         vol = saved;
                     }
+                    _dcNames[id] = name;
                     friends.Add((id, name, vol, mute));
                 }
             }
@@ -342,6 +354,23 @@ public partial class MainWindow
         else if (evt == "SPEAKING_STOP") _dcSpeaking.Remove(id);
         else return;
         if (_dcRows.TryGetValue(id, out var row)) row.Dot.Background = _dcSpeaking.Contains(id) ? P5.Red : P5.Coal;
+        UpdateSpeakers();
+    }
+
+    /// <summary>Refresh the over-the-game list of people talking right now.</summary>
+    private void UpdateSpeakers()
+    {
+        if (_settings.SpeakersCorner == 0) { _speakers?.Hide(); return; }
+        var names = _dcSpeaking
+            .Where(id => id != _dcUserId && _dcNames.ContainsKey(id))
+            .Select(id => _dcNames[id])
+            .OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+        if (names.Count == 0 && _speakers == null) return;
+        _speakers ??= new SpeakersOverlay();
+        // same corner as the mic indicator → sit right next to it instead of on top
+        bool shared = _settings.OverlayCorner == _settings.SpeakersCorner;
+        _speakers.Set(names, _settings.SpeakersCorner, shared ? 36 : 0);
     }
 
     private void DcSetFriends(List<(string Id, string Name, int Volume, bool Mute)> friends)
@@ -404,6 +433,10 @@ public partial class MainWindow
             row.Dot.Background = _dcSpeaking.Contains(f.Id) ? P5.Red : P5.Coal;
         }
         FriendsBtn.Text = friends.Count > 0 ? $"ДРУЗЬЯ ({friends.Count})" : "ДРУЗЬЯ";
+
+        // someone who left mid-word never sends SPEAKING_STOP
+        _dcSpeaking.IntersectWith(friends.Select(f => f.Id));
+        UpdateSpeakers();
     }
 
     private void DcRender()
