@@ -25,6 +25,10 @@ public partial class MainWindow
     // ───────────────────────── keyboard volume keys → headphones bus ─────────────────────────
 
     private bool _volKeysOn;
+    // Voicemeeter reports a changed value with a delay, so during a fast roll we count from our own number
+    private double _volLocal;
+    private bool _volMutedLocal;
+    private DateTime _volLast = DateTime.MinValue;
     private MicToast? _volToast;
     private const int VolUpId = 0x5360, VolDownId = 0x5361, VolMuteId = 0x5362;
 
@@ -72,7 +76,8 @@ public partial class MainWindow
         if (id != VolUpId && id != VolDownId && id != VolMuteId) return false;
         if (!_vm.IsConnected) return true;
 
-        bool muted = _vm.Get("Bus[0].Mute") >= 0.5f;
+        bool rolling = (DateTime.Now - _volLast).TotalSeconds < 1.5;
+        bool muted = rolling ? _volMutedLocal : _vm.Get("Bus[0].Mute") >= 0.5f;
         string text;
         if (id == VolMuteId)
         {
@@ -83,12 +88,17 @@ public partial class MainWindow
         else
         {
             if (muted) { _vm.Set("Bus[0].Mute", 0); muted = false; }
-            double g = Math.Round(_vm.Get("Bus[0].Gain") / 2.0) * 2 + (id == VolUpId ? 2 : -2);
-            g = Math.Clamp(g, -60, 12);
+            double from = rolling ? _volLocal : Math.Round(_vm.Get("Bus[0].Gain") / 2.0) * 2;
+            double g = Math.Clamp(from + (id == VolUpId ? 2 : -2), -60, 12);
+            _volLocal = g;
             _vm.Set("Bus[0].Gain", (float)g);
             if (!PhonesGainS.IsDragging) PhonesGainS.Value = g;
             text = $"ГРОМКОСТЬ {g:+0;-0;0} dB";
         }
+
+        if (!rolling && id == VolMuteId) _volLocal = Math.Round(_vm.Get("Bus[0].Gain") / 2.0) * 2;
+        _volMutedLocal = muted;
+        _volLast = DateTime.Now;
 
         _volToast ??= new MicToast();
         _volToast.Flash(text, muted);
@@ -191,7 +201,9 @@ public partial class MainWindow
         // while ducking lowers the game, the gain we'd read is the temporary one
         bool gameDucked = _ducker is { Active: true, Apps: null };
         if (!gameDucked && !GameGainS.IsDragging) GameGainS.Value = _vm.Get($"Strip[{_vm.HardwareStrips}].Gain");
-        if (!PhonesGainS.IsDragging) PhonesGainS.Value = _vm.Get("Bus[0].Gain");
+        // right after a volume key the value Voicemeeter reports is still the old one
+        if (!PhonesGainS.IsDragging && (DateTime.Now - _volLast).TotalSeconds > 1)
+            PhonesGainS.Value = _vm.Get("Bus[0].Gain");
 
         bool hasAux = _vm.Type != Voicemeeter.VmType.Standard;
         DiscordPanel.Visibility = hasAux ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
