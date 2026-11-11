@@ -39,6 +39,10 @@ public partial class MainWindow
     private List<string> _dcCurrent = new();
     private readonly Dictionary<string, (bool MicOff, bool Deaf)> _dcFlags = new();
     private bool _dcSelfInChannel;
+    private MouseHook? _mouseHook;
+    private bool _spkDragging;
+    private int _spkDragX, _spkDragY;
+    private double _spkStartLeft, _spkStartTop;
     private SpeakersOverlay? _speakers;
 
     private bool DcConfigured =>
@@ -95,12 +99,13 @@ public partial class MainWindow
         SpeakersBtn.Click += _ =>
         {
             _settings.SpeakersCorner = (_settings.SpeakersCorner + 1) % 5;
+            _settings.SpeakersX = _settings.SpeakersY = null; // back to a corner
             _settings.Save();
             SpeakersBtn.Text = "КТО ГОВОРИТ: " + CornerNames[_settings.SpeakersCorner];
             UpdateSpeakers();
         };
         _settings.SpeakersSilentOpacity = Math.Clamp(_settings.SpeakersSilentOpacity, 0.05, 1);
-        _settings.SpeakersScale = Math.Clamp(_settings.SpeakersScale, 0.7, 1.6);
+        _settings.SpeakersScale = Math.Clamp(_settings.SpeakersScale, 0.5, 2.5);
         SpkTalkOnlyT.IsChecked = _settings.SpeakersOnlyTalking;
         SpkNoNamesT.IsChecked = _settings.SpeakersAvatarsOnly;
         SpkSelfT.IsChecked = _settings.SpeakersShowSelf;
@@ -395,6 +400,53 @@ public partial class MainWindow
         UpdateSpeakers();
     }
 
+    /// <summary>Shift + drag moves the list, Shift + wheel over it resizes. Returns true to swallow the event.</summary>
+    private bool OnGlobalMouse(int msg, int x, int y, int delta)
+    {
+        var o = _speakers;
+        if (_spkDragging)
+        {
+            if (msg == MouseHook.WM_MOUSEMOVE && o != null)
+            {
+                var k = o.DpiScale;
+                o.MoveTo(_spkStartLeft + (x - _spkDragX) / k, _spkStartTop + (y - _spkDragY) / k);
+                return false;
+            }
+            if (msg == MouseHook.WM_LBUTTONUP)
+            {
+                _spkDragging = false;
+                if (o?.CustomPos is { } p)
+                {
+                    _settings.SpeakersX = p.X;
+                    _settings.SpeakersY = p.Y;
+                    _settings.Save();
+                }
+                return true;
+            }
+            return false;
+        }
+
+        if (msg != MouseHook.WM_LBUTTONDOWN && msg != MouseHook.WM_MOUSEWHEEL) return false;
+        if (o == null || !o.IsVisible || !MouseHook.ShiftDown || !o.Contains(x, y)) return false;
+
+        if (msg == MouseHook.WM_LBUTTONDOWN)
+        {
+            _spkDragging = true;
+            _spkDragX = x;
+            _spkDragY = y;
+            _spkStartLeft = o.Left;
+            _spkStartTop = o.Top;
+            return true;
+        }
+
+        var scale = Math.Round((_settings.SpeakersScale + Math.Sign(delta) * 0.1) * 10) / 10;
+        _settings.SpeakersScale = Math.Clamp(scale, 0.5, 2.5);
+        _settings.Save();
+        SpkScaleS.Value = Math.Round(_settings.SpeakersScale * 100);
+        UpdateSpeakers();
+        return true;
+    }
+
     private static bool DcFlag(JsonElement e, string name) =>
         e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.True;
 
@@ -409,7 +461,15 @@ public partial class MainWindow
     /// <summary>Refresh the over-the-game list: everyone in the channel, lit up while talking.</summary>
     private void UpdateSpeakers()
     {
-        if (_settings.SpeakersCorner == 0) { _speakers?.Hide(); return; }
+        if (_settings.SpeakersCorner == 0)
+        {
+            _speakers?.Hide();
+            _mouseHook?.Dispose();
+            _mouseHook = null;
+            _spkDragging = false;
+            return;
+        }
+        _mouseHook ??= new MouseHook { Handler = OnGlobalMouse };
         var members = new List<SpeakerInfo>();
         if (_settings.SpeakersShowSelf && _dcSelfInChannel && _dcUserId != null)
         {
@@ -429,7 +489,9 @@ public partial class MainWindow
         bool shared = _settings.OverlayCorner == _settings.SpeakersCorner;
         _speakers.SetMembers(members, _settings.SpeakersCorner, shared ? 36 : 0,
             new SpeakerStyle(_settings.SpeakersOnlyTalking, _settings.SpeakersSilentOpacity,
-                _settings.SpeakersScale, _settings.SpeakersAvatarsOnly));
+                _settings.SpeakersScale, _settings.SpeakersAvatarsOnly),
+            _settings.SpeakersX.HasValue && _settings.SpeakersY.HasValue
+                ? new Point(_settings.SpeakersX.Value, _settings.SpeakersY.Value) : null);
         _speakers.SetSpeaking(_dcSpeaking);
     }
 

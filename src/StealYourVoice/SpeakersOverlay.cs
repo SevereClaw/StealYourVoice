@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -29,6 +30,32 @@ public sealed class SpeakersOverlay : Window
     private string _signature = "";
     private int _corner = 1;
     private double _offset;
+    private Point? _custom;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT { public int Left, Top, Right, Bottom; }
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
+
+    /// <summary>Free position chosen by dragging (overrides the corner).</summary>
+    public Point? CustomPos => _custom;
+
+    public double DpiScale => VisualTreeHelper.GetDpi(this).DpiScaleX;
+
+    /// <summary>Is this physical screen point over the list?</summary>
+    public bool Contains(int x, int y)
+    {
+        var h = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        return h != IntPtr.Zero && GetWindowRect(h, out var r) && x >= r.Left && x < r.Right && y >= r.Top && y < r.Bottom;
+    }
+
+    public void MoveTo(double left, double top)
+    {
+        _custom = new Point(left, top);
+        Left = left;
+        Top = top;
+    }
 
     public SpeakersOverlay()
     {
@@ -50,10 +77,11 @@ public sealed class SpeakersOverlay : Window
 
     /// <param name="corner">1 = top-left, 2 = top-right, 3 = bottom-left, 4 = bottom-right</param>
     /// <param name="offset">vertical gap from the screen edge (to sit next to the mic indicator)</param>
-    public void SetMembers(IReadOnlyList<SpeakerInfo> members, int corner, double offset, SpeakerStyle style)
+    public void SetMembers(IReadOnlyList<SpeakerInfo> members, int corner, double offset, SpeakerStyle style, Point? custom)
     {
-        var signature = $"{corner}|{style}|" + string.Join("|", members.Select(m => m.ToString()));
-        bool moved = corner != _corner || Math.Abs(offset - _offset) > 0.1;
+        var signature = $"{corner}|{custom.HasValue}|{style}|" + string.Join("|", members.Select(m => m.ToString()));
+        bool moved = corner != _corner || Math.Abs(offset - _offset) > 0.1 || custom != _custom;
+        _custom = custom;
         _corner = corner;
         _offset = offset;
         _style = style;
@@ -65,7 +93,7 @@ public sealed class SpeakersOverlay : Window
             _stack.Children.Clear();
             _rows.Clear();
             _lit.Clear();
-            bool right = corner is 2 or 4;
+            bool right = corner is 2 or 4 && !custom.HasValue;
             foreach (var m in members)
             {
                 var row = BuildRow(m, right, style);
@@ -212,6 +240,15 @@ public sealed class SpeakersOverlay : Window
 
     private void Place()
     {
+        if (_custom is { } p)
+        {
+            // keep at least a corner of it on screen
+            Left = Math.Clamp(p.X, SystemParameters.VirtualScreenLeft,
+                SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - 40);
+            Top = Math.Clamp(p.Y, SystemParameters.VirtualScreenTop,
+                SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight - 30);
+            return;
+        }
         var a = SystemParameters.WorkArea;
         const double m = 10;
         Left = _corner is 1 or 3 ? a.Left + m : a.Right - ActualWidth - m;

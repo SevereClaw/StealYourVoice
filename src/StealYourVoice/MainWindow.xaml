@@ -302,6 +302,8 @@
                             <c:SlashToggle x:Name="SpkSelfT" Text="ПОКАЗЫВАТЬ МЕНЯ" Height="32" FontSize="12"
                                            Hint="Ты сам первой строкой, со значком выключенного микрофона при mute" />
                         </WrapPanel>
+                        <TextBlock Foreground="#9A9A9A" FontSize="12" TextWrapping="Wrap" Margin="2,0,0,8"
+                                   Text="Прямо в игре: зажми Shift и тащи список мышкой — подвинуть. Shift + колёсико над списком — размер. Кнопка угла возвращает его в угол." />
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -311,7 +313,7 @@
                             <c:SlashSlider x:Name="SpkOpacityS" Grid.Column="0" Label="ВИДИМОСТЬ МОЛЧАЩИХ" Minimum="5" Maximum="100"
                                            Default="30" Step="5" Unit="%" Decimals="0"
                                            Hint="Насколько видны те, кто молчит: 5% — почти невидимы, 100% — как говорящие" />
-                            <c:SlashSlider x:Name="SpkScaleS" Grid.Column="2" Label="РАЗМЕР" Minimum="70" Maximum="160"
+                            <c:SlashSlider x:Name="SpkScaleS" Grid.Column="2" Label="РАЗМЕР" Minimum="50" Maximum="250"
                                            Default="100" Step="10" Unit="%" Decimals="0"
                                            Hint="Размер плашек в списке" />
                         </Grid>

@@ -63,6 +63,10 @@ public sealed class Settings
     public double SpeakersSilentOpacity { get; set; } = 0.3;
     public double SpeakersScale { get; set; } = 1.0;
 
+    /// <summary>Free position of the list (set by Shift+drag); null = snapped to SpeakersCorner.</summary>
+    public double? SpeakersX { get; set; }
+    public double? SpeakersY { get; set; }
+
     private static readonly string Dir =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StealYourVoice");
     private static readonly string FilePath = Path.Combine(Dir, "settings.json");
