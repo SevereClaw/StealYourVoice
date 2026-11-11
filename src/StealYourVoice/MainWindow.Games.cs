@@ -150,6 +150,7 @@ public partial class MainWindow
         OverlayBtn.Click += _ =>
         {
             _settings.OverlayCorner = (_settings.OverlayCorner + 1) % 5;
+            _settings.OverlayX = _settings.OverlayY = null; // back to a corner
             _settings.Save();
             ApplyOverlay();
         };
@@ -159,13 +160,18 @@ public partial class MainWindow
     private void ApplyOverlay()
     {
         OverlayBtn.Text = "ИНДИКАТОР: " + CornerNames[_settings.OverlayCorner];
+        SyncMouseHook();
         if (_settings.OverlayCorner == 0)
         {
             _overlay?.Hide();
             return;
         }
+        _settings.OverlayScale = Math.Clamp(_settings.OverlayScale, 0.5, 2.5);
         _overlay ??= new MiniOverlay();
-        _overlay.Place(_settings.OverlayCorner);
+        _overlay.Configure(_settings.OverlayCorner, _settings.OverlayScale,
+            _settings.OverlayX.HasValue && _settings.OverlayY.HasValue
+                ? new System.Windows.Point(_settings.OverlayX.Value, _settings.OverlayY.Value) : null,
+            _settings.SpeakersSilentOpacity);
         if (!_overlay.IsVisible) _overlay.Show();
     }
 

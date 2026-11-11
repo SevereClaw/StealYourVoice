@@ -49,6 +49,11 @@ public sealed class Settings
 
     /// <summary>Corner mic indicator: 0 = off, 1..4 = TL, TR, BL, BR.</summary>
     public int OverlayCorner { get; set; }
+    public double OverlayScale { get; set; } = 1.0;
+
+    /// <summary>Free position of the mic indicator (set by Shift+drag); null = snapped to OverlayCorner.</summary>
+    public double? OverlayX { get; set; }
+    public double? OverlayY { get; set; }
 
     public List<UserPreset> Presets { get; set; } = new();
 

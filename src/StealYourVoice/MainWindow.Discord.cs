@@ -46,6 +46,9 @@ public partial class MainWindow
     private HashSet<string>? _dcPrevIds;
     private string? _dcPrevChannel;
     private bool _spkDragging;
+    private bool _dragMic;
+    private double _micGainLocal;
+    private DateTime _micGainLast = DateTime.MinValue;
     private int _spkDragX, _spkDragY;
     private double _spkStartLeft, _spkStartTop;
     private SpeakersOverlay? _speakers;
@@ -121,7 +124,7 @@ public partial class MainWindow
         SpkTalkOnlyT.Click += t => { _settings.SpeakersOnlyTalking = t.IsChecked; _settings.Save(); UpdateSpeakers(); };
         SpkNoNamesT.Click += t => { _settings.SpeakersAvatarsOnly = t.IsChecked; _settings.Save(); UpdateSpeakers(); };
         SpkSelfT.Click += t => { _settings.SpeakersShowSelf = t.IsChecked; _settings.Save(); UpdateSpeakers(); };
-        SpkOpacityS.ValueChanged += v => { _settings.SpeakersSilentOpacity = v / 100.0; _settings.Save(); UpdateSpeakers(); };
+        SpkOpacityS.ValueChanged += v => { _settings.SpeakersSilentOpacity = v / 100.0; _settings.Save(); UpdateSpeakers(); ApplyOverlay(); };
         SpkScaleS.ValueChanged += v => { _settings.SpeakersScale = v / 100.0; _settings.Save(); UpdateSpeakers(); };
         _dcStatus = DcConfigured ? "ПОДКЛЮЧАЮСЬ..." : "НЕ НАСТРОЕНО";
         DcRender();
@@ -422,10 +425,48 @@ public partial class MainWindow
         UpdateSpeakers();
     }
 
+    /// <summary>The global mouse hook lives only while one of the over-the-game overlays is on.</summary>
+    private void SyncMouseHook()
+    {
+        bool want = _settings.SpeakersCorner != 0 || _settings.OverlayCorner != 0;
+        if (want) _mouseHook ??= new MouseHook { Handler = OnGlobalMouse };
+        else
+        {
+            _mouseHook?.Dispose();
+            _mouseHook = null;
+            _spkDragging = false;
+            _dragMic = false;
+        }
+    }
+
     /// <summary>Shift + drag moves the list, Shift + wheel over it resizes. Returns true to swallow the event.</summary>
     private bool OnGlobalMouse(int msg, int x, int y, int delta)
     {
         var o = _speakers;
+        if (_spkDragging && _dragMic)
+        {
+            var m = _overlay;
+            if (msg == MouseHook.WM_MOUSEMOVE && m != null)
+            {
+                var km = m.DpiScale;
+                m.MoveTo(_spkStartLeft + (x - _spkDragX) / km, _spkStartTop + (y - _spkDragY) / km);
+                return false;
+            }
+            if (msg == MouseHook.WM_LBUTTONUP)
+            {
+                _spkDragging = false;
+                _dragMic = false;
+                if (m != null)
+                {
+                    _settings.OverlayX = m.Left;
+                    _settings.OverlayY = m.Top;
+                    _settings.Save();
+                }
+                return true;
+            }
+            return false;
+        }
+
         if (_spkDragging)
         {
             if (msg == MouseHook.WM_MOUSEMOVE && o != null)
@@ -449,6 +490,45 @@ public partial class MainWindow
         }
 
         if (msg != MouseHook.WM_LBUTTONDOWN && msg != MouseHook.WM_MOUSEWHEEL) return false;
+
+        // the mic indicator: Shift + drag / Shift + wheel / Ctrl + wheel (your own mic volume)
+        var mic = _overlay;
+        if (mic != null && mic.IsVisible && (MouseHook.ShiftDown || MouseHook.CtrlDown) && mic.Contains(x, y))
+        {
+            if (MouseHook.ShiftDown)
+            {
+                if (msg == MouseHook.WM_LBUTTONDOWN)
+                {
+                    _spkDragging = true;
+                    _dragMic = true;
+                    _spkDragX = x;
+                    _spkDragY = y;
+                    _spkStartLeft = mic.Left;
+                    _spkStartTop = mic.Top;
+                    return true;
+                }
+                var s = Math.Round((_settings.OverlayScale + Math.Sign(delta) * 0.1) * 10) / 10;
+                _settings.OverlayScale = Math.Clamp(s, 0.5, 2.5);
+                _settings.Save();
+                ApplyOverlay();
+                return true;
+            }
+
+            if (msg == MouseHook.WM_MOUSEWHEEL && _vm.IsConnected)
+            {
+                // Voicemeeter reports new values with a delay, so count from our own number while rolling
+                bool rolling = (DateTime.Now - _micGainLast).TotalSeconds < 1.5;
+                double from = rolling ? _micGainLocal : Math.Round(_vm.Get(S("Gain")));
+                double g = Math.Clamp(from + Math.Sign(delta), -60, 12);
+                _micGainLocal = g;
+                _micGainLast = DateTime.Now;
+                _vm.Set(S("Gain"), (float)g);
+                if (!GainS.IsDragging) GainS.Value = g;
+                mic.ShowNote($"МИКРОФОН {g:+0;-0;0} dB");
+                return true;
+            }
+            return false;
+        }
 
         // Ctrl + wheel over a person → that person's volume
         if (msg == MouseHook.WM_MOUSEWHEEL && o != null && o.IsVisible && MouseHook.CtrlDown && !MouseHook.ShiftDown && o.Contains(x, y))
@@ -534,15 +614,8 @@ public partial class MainWindow
     /// <summary>Refresh the over-the-game list: everyone in the channel, lit up while talking.</summary>
     private void UpdateSpeakers()
     {
-        if (_settings.SpeakersCorner == 0)
-        {
-            _speakers?.Hide();
-            _mouseHook?.Dispose();
-            _mouseHook = null;
-            _spkDragging = false;
-            return;
-        }
-        _mouseHook ??= new MouseHook { Handler = OnGlobalMouse };
+        SyncMouseHook();
+        if (_settings.SpeakersCorner == 0) { _speakers?.Hide(); return; }
         var members = new List<SpeakerInfo>();
         if (_settings.SpeakersShowSelf && _dcSelfInChannel && _dcUserId != null)
         {

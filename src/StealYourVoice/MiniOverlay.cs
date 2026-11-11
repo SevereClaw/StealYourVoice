@@ -7,16 +7,33 @@ using StealYourVoice.Controls;
 
 namespace StealYourVoice;
 
-/// <summary>Tiny always-on-top, click-through mic indicator for the corner of the screen.</summary>
+/// <summary>
+/// Tiny always-on-top, click-through mic indicator. See-through while you are silent,
+/// solid while you talk or while the mic is muted.
+/// </summary>
 public sealed class MiniOverlay : Window
 {
+    private const double BaseW = 178, BaseH = 30, Solid = 0.92;
+
     private readonly Face _face = new();
+    private readonly ScaleTransform _scale = new(1, 1);
+    private int _corner = 1;
+    private Point? _custom;
+    private double _silentOpacity = 0.3;
+    private double _opacity = Solid;
+    private DateTime _lastTalk = DateTime.MinValue;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT { public int Left, Top, Right, Bottom; }
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int index);
 
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
     private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int index, IntPtr value);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
 
     public MiniOverlay()
     {
@@ -29,20 +46,12 @@ public sealed class MiniOverlay : Window
         Focusable = false;
         IsHitTestVisible = false;
         ResizeMode = ResizeMode.NoResize;
-        Width = 178;
-        Height = 30;
-        Opacity = 0.9;
+        Width = BaseW;
+        Height = BaseH;
+        Opacity = Solid;
+        _face.LayoutTransform = _scale;
         Content = _face;
-
-        SourceInitialized += (_, _) =>
-        {
-            // click-through, never takes focus, hidden from Alt+Tab
-            const int GWL_EXSTYLE = -20;
-            const long WS_EX_TRANSPARENT = 0x20, WS_EX_TOOLWINDOW = 0x80, WS_EX_NOACTIVATE = 0x08000000;
-            var h = new WindowInteropHelper(this).Handle;
-            var ex = GetWindowLongPtr(h, GWL_EXSTYLE).ToInt64();
-            SetWindowLongPtr(h, GWL_EXSTYLE, new IntPtr(ex | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE));
-        };
+        SourceInitialized += (_, _) => MakeClickThrough(this);
     }
 
     /// <summary>Click-through, never takes focus, hidden from Alt+Tab. Call after the handle exists.</summary>
@@ -56,21 +65,80 @@ public sealed class MiniOverlay : Window
     }
 
     /// <param name="corner">1 = top-left, 2 = top-right, 3 = bottom-left, 4 = bottom-right</param>
-    public void Place(int corner)
+    /// <param name="custom">free position (overrides the corner)</param>
+    public void Configure(int corner, double scale, Point? custom, double silentOpacity)
     {
-        var a = SystemParameters.WorkArea;
-        const double m = 10;
-        Left = corner is 1 or 3 ? a.Left + m : a.Right - Width - m;
-        Top = corner is 1 or 2 ? a.Top + m : a.Bottom - Height - m;
+        _corner = corner;
+        _custom = custom;
+        _silentOpacity = Math.Clamp(silentOpacity, 0.05, 1);
+        _scale.ScaleX = _scale.ScaleY = scale;
+        Width = BaseW * scale;
+        Height = BaseH * scale;
+        Place();
     }
 
-    public void Push(float linear, bool muted) => _face.Push(linear, muted);
+    private void Place()
+    {
+        if (_custom is { } p)
+        {
+            Left = Math.Clamp(p.X, SystemParameters.VirtualScreenLeft,
+                SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - 40);
+            Top = Math.Clamp(p.Y, SystemParameters.VirtualScreenTop,
+                SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight - 20);
+            return;
+        }
+        var a = SystemParameters.WorkArea;
+        const double m = 10;
+        Left = _corner is 1 or 3 ? a.Left + m : a.Right - Width - m;
+        Top = _corner is 1 or 2 ? a.Top + m : a.Bottom - Height - m;
+    }
+
+    public double DpiScale => VisualTreeHelper.GetDpi(this).DpiScaleX;
+
+    /// <summary>Is this physical screen point over the indicator?</summary>
+    public bool Contains(int x, int y)
+    {
+        var h = new WindowInteropHelper(this).Handle;
+        return h != IntPtr.Zero && GetWindowRect(h, out var r) && x >= r.Left && x < r.Right && y >= r.Top && y < r.Bottom;
+    }
+
+    public void MoveTo(double left, double top)
+    {
+        _custom = new Point(left, top);
+        Left = left;
+        Top = top;
+    }
+
+    /// <summary>Briefly show a text (e.g. "+3 dB") instead of the level bar.</summary>
+    public void ShowNote(string text)
+    {
+        _face.Note = text;
+        _face.NoteUntil = DateTime.Now.AddMilliseconds(1400);
+        _lastTalk = DateTime.Now; // light it up while adjusting
+    }
+
+    /// <summary>Feed the post-mute mic level ~30 times per second.</summary>
+    public void Push(float linear, bool muted)
+    {
+        _face.Push(linear, muted);
+
+        var now = DateTime.Now;
+        if (P5.ToDb(linear) > -45) _lastTalk = now;
+        bool lit = muted || (now - _lastTalk).TotalMilliseconds < 500;
+        double target = lit ? Solid : _silentOpacity * Solid;
+        // snap up quickly, fade down gently
+        _opacity += (target - _opacity) * (target > _opacity ? 0.5 : 0.1);
+        if (Math.Abs(Opacity - _opacity) > 0.004) Opacity = _opacity;
+    }
 
     private sealed class Face : FrameworkElement
     {
         private const int Blades = 14;
         private double _db = -90;
         private bool _muted;
+
+        public string? Note;
+        public DateTime NoteUntil = DateTime.MinValue;
 
         public void Push(float linear, bool muted)
         {
@@ -85,6 +153,14 @@ public sealed class MiniOverlay : Window
             double w = ActualWidth, h = ActualHeight;
             if (w < 20) return;
             var plate = new Rect(1, 1, w - 2, h - 2);
+
+            if (Note != null && DateTime.Now < NoteUntil)
+            {
+                dc.DrawGeometry(P5.Black, P5.Pen(P5.Red, 2), P5.Slant(plate, 9));
+                var n = P5.Text(this, Note, P5.HeavyItalic, 14, P5.White);
+                dc.DrawText(n, new Point((w - n.Width) / 2, (h - n.Height) / 2));
+                return;
+            }
 
             if (_muted)
             {
