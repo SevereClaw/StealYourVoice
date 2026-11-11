@@ -98,6 +98,7 @@ public partial class MainWindow
             _overlay.Push(Math.Max(l, r), MuteT.IsChecked);
         }
 
+        if (_tick % 15 == 0) FocusTick();
         if (_tick % 90 == 0) GameTick();
     }
 
@@ -119,7 +120,7 @@ public partial class MainWindow
 
     private void AddGameMenuItems(ContextMenu menu, UserPreset preset, SlashToggle button)
     {
-        var bind = new MenuItem { Header = "Привязать к игре (включается сам при запуске)..." };
+        var bind = new MenuItem { Header = "Привязать к программе (включается, когда она активна)..." };
         bind.Click += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => ShowBindMenu(preset, button)));
         menu.Items.Add(bind);
 
@@ -139,7 +140,7 @@ public partial class MainWindow
     private void ShowBindMenu(UserPreset preset, SlashToggle button)
     {
         var menu = new ContextMenu { PlacementTarget = button, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
-        menu.Items.Add(new MenuItem { Header = "Запусти игру и выбери её из списка:", IsEnabled = false });
+        menu.Items.Add(new MenuItem { Header = "Открой программу и выбери её из списка:", IsEnabled = false });
         menu.Items.Add(new Separator());
 
         var apps = WindowedApps();
@@ -158,6 +159,7 @@ public partial class MainWindow
                 preset.Process = proc;
                 _settings.Save();
                 BuildPresets();
+                _activeGame = null; // re-evaluate on the next focus check
                 StatusText.Text = $"ПРЕСЕТ «{preset.Name.ToUpperInvariant()}» ПРИВЯЗАН К {proc.ToUpperInvariant()}";
             };
             menu.Items.Add(mi);
@@ -200,42 +202,64 @@ public partial class MainWindow
         return set;
     }
 
-    /// <summary>Every ~3 s: a bound game started → apply its preset; it closed → put the old settings back.</summary>
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    private static string? ForegroundProcessName()
+    {
+        try
+        {
+            var h = GetForegroundWindow();
+            if (h == IntPtr.Zero) return null;
+            GetWindowThreadProcessId(h, out var pid);
+            if (pid == 0) return null;
+            using var p = Process.GetProcessById((int)pid);
+            return p.ProcessName;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Twice a second: the program in focus has its own preset → switch to it.
+    /// Windows without a preset (desktop, browser, this panel) keep whatever is on.
+    /// </summary>
+    private void FocusTick()
+    {
+        if (!_vm.IsConnected) return;
+        if (!_settings.Presets.Any(p => !string.IsNullOrEmpty(p.Process))) return;
+
+        var name = ForegroundProcessName();
+        if (name == null || string.Equals(name, _activeGame, StringComparison.OrdinalIgnoreCase)) return;
+        var hit = _settings.Presets.FirstOrDefault(p => string.Equals(p.Process, name, StringComparison.OrdinalIgnoreCase));
+        if (hit == null) return;
+
+        if (_activeGame == null) _beforeGame = CaptureCurrent(""); // what to return to when they all close
+        ApplyUserPreset(hit);
+        _activeGame = hit.Process;
+        StatusText.Text = $"{hit.Process!.ToUpperInvariant()} В ФОКУСЕ // ПРЕСЕТ «{hit.Name.ToUpperInvariant()}»";
+    }
+
+    /// <summary>Every ~3 s: once every program with a preset is closed, put the old settings back.</summary>
     private async void GameTick()
     {
-        if (_gameScanBusy) return;
-        var bound = _settings.Presets.Where(p => !string.IsNullOrEmpty(p.Process)).ToList();
-        if (bound.Count == 0 && _activeGame == null) return;
-
+        if (_gameScanBusy || _activeGame == null) return;
         _gameScanBusy = true;
         try
         {
+            var bound = _settings.Presets.Where(p => !string.IsNullOrEmpty(p.Process)).Select(p => p.Process!).ToList();
             var running = await Task.Run(RunningProcessNames);
-            if (!_vm.IsConnected) return;
+            if (!_vm.IsConnected || _activeGame == null) return;
+            if (bound.Any(running.Contains)) return;
 
-            if (_activeGame != null && !running.Contains(_activeGame))
+            _activeGame = null;
+            if (_beforeGame != null)
             {
-                var closed = _activeGame;
-                _activeGame = null;
-                if (_beforeGame != null)
-                {
-                    ApplyUserPreset(_beforeGame);
-                    _beforeGame = null;
-                    StatusText.Text = $"{closed.ToUpperInvariant()} ЗАКРЫТА // ВЕРНУЛ ПРЕЖНИЕ НАСТРОЙКИ";
-                }
-            }
-
-            if (_activeGame == null)
-            {
-                var hit = bound.FirstOrDefault(p => running.Contains(p.Process!));
-                if (hit != null)
-                {
-                    _beforeGame = CaptureCurrent("");
-                    ApplyUserPreset(hit);
-                    _activeGame = hit.Process;
-                    StatusText.Text = $"{hit.Process!.ToUpperInvariant()} ЗАПУЩЕНА // ПРЕСЕТ «{hit.Name.ToUpperInvariant()}»";
-                    Audio.Sfx.Play("confirm");
-                }
+                ApplyUserPreset(_beforeGame);
+                _beforeGame = null;
+                StatusText.Text = "ПРОГРАММЫ С ПРЕСЕТАМИ ЗАКРЫТЫ // ВЕРНУЛ ПРЕЖНИЕ НАСТРОЙКИ";
             }
         }
         catch { /* ignore */ }

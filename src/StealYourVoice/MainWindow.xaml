@@ -179,7 +179,7 @@
 
                         <TextBlock Style="{StaticResource SubHeader}" Text="ПРЕСЕТЫ" />
                         <WrapPanel x:Name="PresetPanel" />
-                        <TextBlock Text="ПКМ по своему пресету — перезаписать / удалить / привязать к игре" Foreground="#808080" FontSize="11" Margin="2,0,0,0" />
+                        <TextBlock Text="ПКМ по своему пресету — перезаписать / удалить / привязать к программе" Foreground="#808080" FontSize="11" Margin="2,0,0,0" />
 
                         <DockPanel Margin="0,10,0,6">
                             <TextBlock x:Name="DuckState" DockPanel.Dock="Right" Text="ВЫКЛЮЧЕНО" Foreground="#808080"
