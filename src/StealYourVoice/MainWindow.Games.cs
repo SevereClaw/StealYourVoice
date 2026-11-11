@@ -183,7 +183,9 @@ public partial class MainWindow
         if (hasAux)
         {
             var (fl, fr) = _vm.StripChannels(AuxStrip, 0); // pre-fader: what Discord sends us
-            _friendsTalking = P5.ToDb(Math.Max(fl, fr)) > -45;
+            double auxDb = P5.ToDb(Math.Max(fl, fr));
+            _friendsTalking = auxDb > -45;
+            TrackLoudness(auxDb);
             if (IsVisible)
             {
                 DiscordState.Text = _friendsTalking ? "● ГОВОРЯТ" : "ТИШИНА";

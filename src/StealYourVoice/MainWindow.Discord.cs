@@ -42,6 +42,10 @@ public partial class MainWindow
     private MouseHook? _mouseHook;
     private MicToast? _joinToast;
     private string? _dcOutputName;
+    private readonly Dictionary<string, int> _dcLoud = new();
+    private readonly Dictionary<string, double> _lvlAvg = new();
+    private readonly Dictionary<string, int> _lvlCount = new();
+    private static readonly Dictionary<string, int> NoLoudness = new();
     private int _dcPollCount;
     private HashSet<string>? _dcPrevIds;
     private string? _dcPrevChannel;
@@ -117,6 +121,8 @@ public partial class MainWindow
         SpkTalkOnlyT.IsChecked = _settings.SpeakersOnlyTalking;
         SpkNoNamesT.IsChecked = _settings.SpeakersAvatarsOnly;
         SpkSelfT.IsChecked = _settings.SpeakersShowSelf;
+        SpkLoudT.IsChecked = _settings.SpeakersLoudness;
+        SpkLoudT.Click += t => { _settings.SpeakersLoudness = t.IsChecked; _settings.Save(); UpdateSpeakers(); };
         SpkJoinT.IsChecked = _settings.JoinLeaveToasts;
         SpkJoinT.Click += t => { _settings.JoinLeaveToasts = t.IsChecked; _settings.Save(); };
         SpkOpacityS.Value = Math.Round(_settings.SpeakersSilentOpacity * 100);
@@ -158,6 +164,9 @@ public partial class MainWindow
         _dcSelfInChannel = false;
         _dcOutputName = null;
         _dcPollCount = 0;
+        _dcLoud.Clear();
+        _lvlAvg.Clear();
+        _lvlCount.Clear();
         _dcPrevIds = null;
         _dcPrevChannel = null;
         _dcApplied.Clear();
@@ -352,7 +361,8 @@ public partial class MainWindow
                     if (!vs.TryGetProperty("user", out var user)) continue;
                     var id = DiscordRpc.Str(user, "id");
                     if (id == null) continue;
-                    var name = DiscordRpc.Str(vs, "nick") ?? DiscordRpc.Str(user, "global_name") ?? DiscordRpc.Str(user, "username") ?? id;
+                    var name = CleanName(DiscordRpc.Str(vs, "nick")) ?? CleanName(DiscordRpc.Str(user, "global_name"))
+                               ?? CleanName(DiscordRpc.Str(user, "username")) ?? id;
 
                     bool micOff = false, deaf = false;
                     if (vs.TryGetProperty("voice_state", out var st) && st.ValueKind == JsonValueKind.Object)
@@ -600,6 +610,70 @@ public partial class MainWindow
         return id;
     }
 
+    /// <summary>
+    /// "Fancy" nicknames (𝐎𝐥𝐚𝐯, Ｏｌａｖ, emoji, zalgo) have no glyphs in our font and came out as boxes.
+    /// Fold look-alike letters into plain ones and drop what can't be drawn.
+    /// </summary>
+    private static string? CleanName(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        string s;
+        try { s = raw.Normalize(System.Text.NormalizationForm.FormKC); } catch { s = raw; }
+        var sb = new System.Text.StringBuilder(s.Length);
+        foreach (var ch in s)
+        {
+            if (char.IsSurrogate(ch)) continue; // emoji and other astral symbols
+            switch (char.GetUnicodeCategory(ch))
+            {
+                case System.Globalization.UnicodeCategory.Format:
+                case System.Globalization.UnicodeCategory.Control:
+                case System.Globalization.UnicodeCategory.PrivateUse:
+                case System.Globalization.UnicodeCategory.OtherNotAssigned:
+                case System.Globalization.UnicodeCategory.NonSpacingMark:
+                case System.Globalization.UnicodeCategory.EnclosingMark:
+                case System.Globalization.UnicodeCategory.OtherSymbol:
+                    continue;
+            }
+            sb.Append(ch);
+        }
+        var clean = System.Text.RegularExpressions.Regex.Replace(sb.ToString(), @"\s+", " ").Trim();
+        return clean.Length == 0 ? null : clean;
+    }
+
+    /// <summary>
+    /// Discord doesn't tell us how loud each person is, but while exactly one friend is talking
+    /// the level on the AUX input is theirs. Average it and flag the very quiet / very loud ones.
+    /// </summary>
+    private void TrackLoudness(double auxDb)
+    {
+        if (!_dcAuthed || !_settings.SpeakersLoudness || _settings.SpeakersCorner == 0 || auxDb < -55) return;
+
+        string? only = null;
+        int talking = 0;
+        foreach (var id in _dcSpeaking)
+        {
+            if (id == _dcUserId) continue;
+            talking++;
+            only = id;
+        }
+        if (talking != 1 || only == null) return;
+
+        double avg = _lvlAvg.TryGetValue(only, out var a) ? a + (auxDb - a) * 0.05 : auxDb;
+        _lvlAvg[only] = avg;
+        int n = _lvlCount[only] = _lvlCount.GetValueOrDefault(only) + 1;
+        if (n < 25) return; // ~0.8 s of speech before judging
+
+        int cur = _dcLoud.GetValueOrDefault(only);
+        int next = cur;
+        if (cur == 0) next = avg < -36 ? -1 : avg > -9 ? 1 : 0;
+        else if (cur < 0 && avg > -33) next = 0;
+        else if (cur > 0 && avg < -12) next = 0;
+        if (next == cur) return;
+
+        _dcLoud[only] = next;
+        UpdateSpeakers();
+    }
+
     private static bool DcFlag(JsonElement e, string name) =>
         e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.True;
 
@@ -639,6 +713,7 @@ public partial class MainWindow
             _settings.SpeakersX.HasValue && _settings.SpeakersY.HasValue
                 ? new Point(_settings.SpeakersX.Value, _settings.SpeakersY.Value) : null);
         _speakers.SetSpeaking(_dcSpeaking);
+        _speakers.SetLoudness(_settings.SpeakersLoudness ? _dcLoud : NoLoudness, _dcSpeaking);
     }
 
     private void DcSetFriends(List<(string Id, string Name, int Volume, bool Mute)> friends)

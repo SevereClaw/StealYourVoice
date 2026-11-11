@@ -38,6 +38,9 @@ public sealed class SpeakersOverlay : Window
     private readonly Dictionary<string, TextBlock> _volLabels = new();
     private readonly DispatcherTimer _volTimer = new() { Interval = TimeSpan.FromMilliseconds(1400) };
     private string? _volShownFor;
+    private readonly Dictionary<string, TextBlock> _tags = new();
+    private readonly Dictionary<string, TranslateTransform> _moves = new();
+    private readonly Dictionary<string, int> _loudApplied = new();
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT { public int Left, Top, Right, Bottom; }
@@ -121,6 +124,46 @@ public sealed class SpeakersOverlay : Window
         _volTimer.Start();
     }
 
+    /// <summary>
+    /// Flag people who are much quieter / louder than normal while they talk:
+    /// −1 → blinking "ТИХО", +1 → red "ГРОМКО" and the plate shakes.
+    /// </summary>
+    public void SetLoudness(IReadOnlyDictionary<string, int> states, ICollection<string> speaking)
+    {
+        foreach (var kv in _rows)
+        {
+            var id = kv.Key;
+            int s = speaking.Contains(id) && states.TryGetValue(id, out var v) ? v : 0;
+            if (_loudApplied.TryGetValue(id, out var was) && was == s) continue;
+            _loudApplied[id] = s;
+            if (!_tags.TryGetValue(id, out var tag) || !_moves.TryGetValue(id, out var move)) continue;
+
+            tag.BeginAnimation(OpacityProperty, null);
+            move.BeginAnimation(TranslateTransform.XProperty, null);
+            if (s == 0) { tag.Visibility = Visibility.Collapsed; continue; }
+
+            tag.Visibility = Visibility.Visible;
+            if (s < 0)
+            {
+                tag.Text = "▼ ТИХО";
+                tag.Foreground = P5.White;
+                tag.BeginAnimation(OpacityProperty, new DoubleAnimation(1, 0.2, TimeSpan.FromMilliseconds(450))
+                    { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever });
+            }
+            else
+            {
+                tag.Text = "▲ ГРОМКО";
+                tag.Foreground = P5.Red;
+                var shake = new DoubleAnimationUsingKeyFrames
+                    { Duration = TimeSpan.FromMilliseconds(320), RepeatBehavior = RepeatBehavior.Forever };
+                double[] xs = { -4, 4, -3, 3, -1, 0 };
+                for (int i = 0; i < xs.Length; i++)
+                    shake.KeyFrames.Add(new LinearDoubleKeyFrame(xs[i], KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(45 * (i + 1)))));
+                move.BeginAnimation(TranslateTransform.XProperty, shake);
+            }
+        }
+    }
+
     private void Bounce(string id)
     {
         if (!_scales.TryGetValue(id, out var sc)) return;
@@ -153,6 +196,9 @@ public sealed class SpeakersOverlay : Window
             _lit.Clear();
             _scales.Clear();
             _volLabels.Clear();
+            _tags.Clear();
+            _moves.Clear();
+            _loudApplied.Clear();
             _volShownFor = null;
             var before = _known;
             _known = new HashSet<string>(members.Select(m => m.Id));
@@ -161,7 +207,7 @@ public sealed class SpeakersOverlay : Window
             bool right = corner is 2 or 4 && !custom.HasValue;
             foreach (var m in members)
             {
-                var row = BuildRow(m, right, style, out var vol);
+                var row = BuildRow(m, right, style, out var vol, out var tag);
                 var sc = new ScaleTransform(1, 1);
                 var tr = new TranslateTransform();
                 row.RenderTransformOrigin = new Point(0.5, 0.5);
@@ -169,6 +215,8 @@ public sealed class SpeakersOverlay : Window
                 _rows[m.Id] = row;
                 _scales[m.Id] = sc;
                 _volLabels[m.Id] = vol;
+                _tags[m.Id] = tag;
+                _moves[m.Id] = tr;
                 _stack.Children.Add(row);
 
                 // someone new joined → their plate flies in from the screen edge
@@ -214,11 +262,19 @@ public sealed class SpeakersOverlay : Window
         }
     }
 
-    private static Border BuildRow(SpeakerInfo m, bool right, SpeakerStyle style, out TextBlock vol)
+    private static Border BuildRow(SpeakerInfo m, bool right, SpeakerStyle style, out TextBlock vol, out TextBlock tag)
     {
+        tag = new TextBlock
+        {
+            FontFamily = new FontFamily("Arial Black, Segoe UI Symbol"),
+            FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(6, 0, 10, 0),
+            Visibility = Visibility.Collapsed
+        };
         vol = new TextBlock
         {
-            FontFamily = new FontFamily("Arial Black"),
+            FontFamily = new FontFamily("Arial Black, Segoe UI, Segoe UI Symbol"),
             FontSize = 14,
             Foreground = P5.Red,
             VerticalAlignment = VerticalAlignment.Center,
@@ -236,7 +292,7 @@ public sealed class SpeakersOverlay : Window
             Child = new TextBlock
             {
                 Text = name.Length > 0 ? name[..1].ToUpperInvariant() : "?",
-                FontFamily = new FontFamily("Arial Black"),
+                FontFamily = new FontFamily("Arial Black, Segoe UI, Segoe UI Symbol"),
                 FontSize = 16,
                 Foreground = P5.White,
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -265,6 +321,8 @@ public sealed class SpeakersOverlay : Window
         row.Children.Add(avatar);
         DockPanel.SetDock(vol, Dock.Right);
         row.Children.Add(vol);
+        DockPanel.SetDock(tag, Dock.Right);
+        row.Children.Add(tag);
 
         if (style.AvatarsOnly)
         {
@@ -291,7 +349,7 @@ public sealed class SpeakersOverlay : Window
             row.Children.Add(new TextBlock
             {
                 Text = name.ToUpperInvariant(),
-                FontFamily = new FontFamily("Arial Black"),
+                FontFamily = new FontFamily("Arial Black, Segoe UI, Segoe UI Symbol"),
                 FontStyle = FontStyles.Italic,
                 FontSize = 14,
                 Foreground = P5.White,

@@ -315,6 +315,8 @@
                                            Hint="Только аватарки — узкий столбик" />
                             <c:SlashToggle x:Name="SpkSelfT" Text="ПОКАЗЫВАТЬ МЕНЯ" Height="32" FontSize="12"
                                            Hint="Ты сам первой строкой, со значком выключенного микрофона при mute" />
+                            <c:SlashToggle x:Name="SpkLoudT" Text="ТИХО / ГРОМКО" Height="32" FontSize="12" Tilt="1"
+                                           Hint="Помечать в списке тех, кто говорит заметно тише или громче нормы: «ТИХО» мигает, «ГРОМКО» трясёт плашку. Нужен вывод Discord в Voicemeeter AUX Input" />
                             <c:SlashToggle x:Name="SpkJoinT" Text="ВХОД / ВЫХОД" Height="32" FontSize="12" Tilt="-1"
                                            Hint="Плашка вверху экрана «ИМЯ ЗАШЁЛ / ВЫШЕЛ», когда кто-то заходит в твой голосовой канал или выходит" />
                         </WrapPanel>

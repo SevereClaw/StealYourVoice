@@ -71,6 +71,7 @@ public sealed class Settings
     public bool SpeakersAvatarsOnly { get; set; }
     public bool SpeakersShowSelf { get; set; } = true;
     public bool JoinLeaveToasts { get; set; } = true;
+    public bool SpeakersLoudness { get; set; } = true;
     public double SpeakersSilentOpacity { get; set; } = 0.3;
     public double SpeakersScale { get; set; } = 1.0;
 
