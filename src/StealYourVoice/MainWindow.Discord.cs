@@ -35,6 +35,8 @@ public partial class MainWindow
     private readonly HashSet<string> _dcApplied = new();
     private readonly HashSet<string> _dcSpeaking = new();
     private readonly Dictionary<string, string> _dcNames = new();
+    private readonly Dictionary<string, string> _dcAvatars = new();
+    private List<string> _dcCurrent = new();
     private SpeakersOverlay? _speakers;
 
     private bool DcConfigured =>
@@ -316,6 +318,7 @@ public partial class MainWindow
                         vol = saved;
                     }
                     _dcNames[id] = name;
+                    _dcAvatars[id] = AvatarUrl(id, DiscordRpc.Str(user, "avatar"));
                     friends.Add((id, name, vol, mute));
                 }
             }
@@ -357,20 +360,27 @@ public partial class MainWindow
         UpdateSpeakers();
     }
 
-    /// <summary>Refresh the over-the-game list of people talking right now.</summary>
+    private static string AvatarUrl(string id, string? hash)
+    {
+        if (!string.IsNullOrEmpty(hash)) return $"https://cdn.discordapp.com/avatars/{id}/{hash}.png?size=64";
+        // no custom avatar → one of Discord's default ones
+        int index = ulong.TryParse(id, out var n) ? (int)((n >> 22) % 6) : 0;
+        return $"https://cdn.discordapp.com/embed/avatars/{index}.png";
+    }
+
+    /// <summary>Refresh the over-the-game list: everyone in the channel, lit up while talking.</summary>
     private void UpdateSpeakers()
     {
         if (_settings.SpeakersCorner == 0) { _speakers?.Hide(); return; }
-        var names = _dcSpeaking
-            .Where(id => id != _dcUserId && _dcNames.ContainsKey(id))
-            .Select(id => _dcNames[id])
-            .OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase)
+        var members = _dcCurrent
+            .Select(id => (Id: id, Name: _dcNames.GetValueOrDefault(id, id), Avatar: _dcAvatars.GetValueOrDefault(id)))
             .ToList();
-        if (names.Count == 0 && _speakers == null) return;
+        if (members.Count == 0 && _speakers == null) return;
         _speakers ??= new SpeakersOverlay();
         // same corner as the mic indicator → sit right next to it instead of on top
         bool shared = _settings.OverlayCorner == _settings.SpeakersCorner;
-        _speakers.Set(names, _settings.SpeakersCorner, shared ? 36 : 0);
+        _speakers.SetMembers(members, _settings.SpeakersCorner, shared ? 36 : 0);
+        _speakers.SetSpeaking(_dcSpeaking);
     }
 
     private void DcSetFriends(List<(string Id, string Name, int Volume, bool Mute)> friends)
@@ -435,6 +445,7 @@ public partial class MainWindow
         FriendsBtn.Text = friends.Count > 0 ? $"ДРУЗЬЯ ({friends.Count})" : "ДРУЗЬЯ";
 
         // someone who left mid-word never sends SPEAKING_STOP
+        _dcCurrent = friends.OrderBy(f => f.Name, StringComparer.CurrentCultureIgnoreCase).Select(f => f.Id).ToList();
         _dcSpeaking.IntersectWith(friends.Select(f => f.Id));
         UpdateSpeakers();
     }
