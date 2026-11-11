@@ -184,6 +184,7 @@ public partial class MainWindow : Window
     private void OnConnected()
     {
         if (_strip >= _vm.HardwareStrips) _strip = 0;
+        Audio.Ducker.RestoreAfterCrash(_vm);
         BuildStripButtons();
         RefreshParams();
         Offline.Visibility = Visibility.Collapsed;
@@ -582,6 +583,8 @@ public partial class MainWindow : Window
     {
         _ducker = new Audio.Ducker(_vm);
         Audio.AppDucker.RestoreAfterCrash();
+        // Windows shutting down / logging off: never leave anything ducked behind
+        Application.Current.SessionEnding += (_, _) => _ducker?.Restore();
         UpdateExcludeButton();
         ExcludeBtn.Click += _ => ShowExcludeMenu();
         DuckT.IsChecked = _settings.DuckEnabled;

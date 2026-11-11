@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
 using StealYourVoice.Voicemeeter;
 
 namespace StealYourVoice.Audio;
@@ -15,6 +17,24 @@ public sealed class Ducker
     private readonly List<int> _targets = new();
     private DateTime _lastVoice = DateTime.MinValue;
     private bool _held;
+
+    // Voicemeeter saves its faders, so a crash / shutdown mid-duck would leave the game quiet forever.
+    private static readonly string BackupFile = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StealYourVoice", "ducked-strips.json");
+
+    /// <summary>If the previous run ended while inputs were ducked, give them their gain back.</summary>
+    public static void RestoreAfterCrash(VmClient vm)
+    {
+        try
+        {
+            if (!File.Exists(BackupFile)) return;
+            var backup = JsonSerializer.Deserialize<Dictionary<int, float>>(File.ReadAllText(BackupFile));
+            if (backup != null)
+                foreach (var kv in backup) vm.Set($"Strip[{kv.Key}].Gain", kv.Value);
+            File.Delete(BackupFile);
+        }
+        catch { /* ignore */ }
+    }
 
     private const double HoldMs = 450;        // keep ducked a bit after the last word
     private const double AttackPerTick = 4.0; // dB per 33 ms tick
@@ -74,6 +94,15 @@ public sealed class Ducker
         _held = true;
         _base.Clear();
         foreach (var t in _targets) _base[t] = _vm.Get($"Strip[{t}].Gain");
+        if (_base.Count > 0)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(BackupFile)!);
+                File.WriteAllText(BackupFile, JsonSerializer.Serialize(_base));
+            }
+            catch { /* ignore */ }
+        }
         Apps?.Capture();
     }
 
@@ -88,6 +117,7 @@ public sealed class Ducker
     {
         _held = false;
         _base.Clear();
+        try { if (File.Exists(BackupFile)) File.Delete(BackupFile); } catch { /* ignore */ }
         Apps?.Release();
     }
 

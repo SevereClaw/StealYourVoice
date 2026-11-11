@@ -164,6 +164,7 @@ public partial class MainWindow
     private void StartDiagnostics()
     {
         if (!_vm.IsConnected) return;
+        _ducker?.Restore(); // measure the real levels, not a momentary duck
         OpenTool(ToolMode.Diag, "ДИАГНОСТИКА");
         ToolSub.Text = "Скажи пару слов обычным голосом: проверю сигнал. Заодно проверю настройки Voicemeeter и Windows.";
         _phase = Phase.Speech;
@@ -295,6 +296,37 @@ public partial class MainWindow
                     "ВКЛЮЧИТЬ MONO", () => _vm.Set(S("Mono"), 1));
             }
         }
+
+        // ── something left turned down (e.g. the panel was killed mid-duck)? ──
+        int vCount = _vm.Type switch { VmType.Standard => 1, VmType.Banana => 2, _ => 3 };
+        for (int v = 0; v < vCount; v++)
+        {
+            int idx = _vm.HardwareStrips + v;
+            var g = _vm.Get($"Strip[{idx}].Gain");
+            if (g > -0.5f) continue;
+            var name = v == 0 ? "Voicemeeter Input (весь звук компьютера)" : v == 1 ? "Voicemeeter AUX (Discord)" : "Voicemeeter VAIO3";
+            Count(Sev.Warn);
+            AddRow(Sev.Warn, $"Вход «{name}» убавлен на {-g:0.#} dB — всё, что через него играет, звучит тише.",
+                "ВЕРНУТЬ 0 dB", () => _vm.Set($"Strip[{idx}].Gain", 0));
+        }
+
+        var a1Gain = _vm.Get("Bus[0].Gain");
+        if (a1Gain < -0.5f)
+        {
+            Count(Sev.Warn);
+            AddRow(Sev.Warn, $"Выход на наушники (A1) убавлен на {-a1Gain:0.#} dB — тише вообще всё.",
+                "ВЕРНУТЬ 0 dB", () => _vm.Set("Bus[0].Gain", 0));
+        }
+
+        var quiet = AppDucker.QuietApps();
+        if (quiet.Count > 0)
+        {
+            Count(Sev.Warn);
+            AddRow(Sev.Warn, "В микшере громкости Windows убавлены программы: " +
+                             string.Join(", ", quiet.Select(q => $"{q.Name} {q.Percent}%")) + ".",
+                "ВСЕ НА 100%", AppDucker.ResetVolumes);
+        }
+        else AddRow(Sev.Ok, "В микшере Windows все программы на полной громкости.");
 
         // ── Windows ──
         var formats = WindowsAudioChecks.ActiveEndpointFormats();

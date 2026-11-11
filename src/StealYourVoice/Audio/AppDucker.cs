@@ -28,7 +28,27 @@ public sealed class AppDucker
     /// <summary>Process names (no .exe) that must not be ducked.</summary>
     public ICollection<string> Exclude { get; set; } = new List<string>();
 
-    public static bool IsAlwaysSkipped(string name) => Always.Contains(name);
+    /// <summary>Voicemeeter's own output session carries ALL sound — ducking it would duck everything.</summary>
+    public static bool IsAlwaysSkipped(string name) =>
+        Always.Contains(name) || name.StartsWith("voicemeeter", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Programs whose volume in the Windows mixer is below 100%.</summary>
+    public static List<(string Name, int Percent)> QuietApps() =>
+        Sessions().Select(s => { try { return (s.Name, Vol: s.Volume.Volume); } catch { return (s.Name, Vol: 1f); } })
+            .Where(x => x.Vol < 0.97f)
+            .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(g => (g.Key, (int)Math.Round(g.Min(x => x.Vol) * 100)))
+            .OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    /// <summary>Put every program in the Windows mixer back to 100%.</summary>
+    public static void ResetVolumes()
+    {
+        foreach (var (vol, _) in Sessions())
+        {
+            try { if (vol.Volume < 0.97f) vol.Volume = 1f; } catch { /* ignore */ }
+        }
+    }
 
     private static IEnumerable<(SimpleAudioVolume Volume, string Name)> Sessions()
     {
@@ -67,7 +87,7 @@ public sealed class AppDucker
     /// <summary>Programs that have a sound session right now (for the "don't duck" menu).</summary>
     public static List<string> AppsWithSound() =>
         Sessions().Select(s => s.Name)
-            .Where(n => !Always.Contains(n))
+            .Where(n => !IsAlwaysSkipped(n))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -77,7 +97,7 @@ public sealed class AppDucker
         _held.Clear();
         foreach (var (vol, name) in Sessions())
         {
-            if (Always.Contains(name) || Exclude.Contains(name, StringComparer.OrdinalIgnoreCase)) continue;
+            if (IsAlwaysSkipped(name) || Exclude.Contains(name, StringComparer.OrdinalIgnoreCase)) continue;
             try { _held.Add((vol, vol.Volume, name)); } catch { /* ignore */ }
         }
 
