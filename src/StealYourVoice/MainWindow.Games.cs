@@ -79,6 +79,7 @@ public partial class MainWindow
         bool rolling = (DateTime.Now - _volLast).TotalSeconds < 1.5;
         bool muted = rolling ? _volMutedLocal : _vm.Get("Bus[0].Mute") >= 0.5f;
         string text;
+        double level = -1;
         if (id == VolMuteId)
         {
             _vm.Set("Bus[0].Mute", muted ? 0 : 1);
@@ -94,6 +95,7 @@ public partial class MainWindow
             _vm.Set("Bus[0].Gain", (float)g);
             if (!PhonesGainS.IsDragging) PhonesGainS.Value = g;
             text = $"ГРОМКОСТЬ {g:+0;-0;0} dB";
+            level = (g + 60) / 72.0;
         }
 
         if (!rolling && id == VolMuteId) _volLocal = Math.Round(_vm.Get("Bus[0].Gain") / 2.0) * 2;
@@ -101,7 +103,8 @@ public partial class MainWindow
         _volLast = DateTime.Now;
 
         _volToast ??= new MicToast();
-        _volToast.Flash(text, muted);
+        if (level >= 0) _volToast.FlashLevel(text, level);
+        else _volToast.Flash(text, muted);
         return true;
     }
 

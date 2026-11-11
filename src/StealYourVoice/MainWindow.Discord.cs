@@ -51,6 +51,7 @@ public partial class MainWindow
     private string? _dcPrevChannel;
     private bool _spkDragging;
     private bool _dragMic;
+    private long _hoverCheck;
     private double _micGainLocal;
     private DateTime _micGainLast = DateTime.MinValue;
     private int _spkDragX, _spkDragY;
@@ -453,6 +454,17 @@ public partial class MainWindow
     private bool OnGlobalMouse(int msg, int x, int y, int delta)
     {
         var o = _speakers;
+
+        // plain mouse movement: hovering a plate spreads the list and shows the full nickname
+        if (msg == MouseHook.WM_MOUSEMOVE && !_spkDragging)
+        {
+            long now = Environment.TickCount64;
+            if (now - _hoverCheck < 40) return false;
+            _hoverCheck = now;
+            if (o != null && o.IsVisible) o.SetHover(o.Contains(x, y) ? o.RowAt(x, y) : null);
+            return false;
+        }
+
         if (_spkDragging && _dragMic)
         {
             var m = _overlay;
@@ -534,7 +546,7 @@ public partial class MainWindow
                 _micGainLast = DateTime.Now;
                 _vm.Set(S("Gain"), (float)g);
                 if (!GainS.IsDragging) GainS.Value = g;
-                mic.ShowNote($"МИКРОФОН {g:+0;-0;0} dB");
+                mic.ShowNote($"МИКРОФОН {g:+0;-0;0} dB", (g + 60) / 72.0, delta > 0);
                 return true;
             }
             return false;

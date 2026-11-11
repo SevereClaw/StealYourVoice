@@ -110,9 +110,11 @@ public sealed class MiniOverlay : Window
     }
 
     /// <summary>Briefly show a text (e.g. "+3 dB") instead of the level bar.</summary>
-    public void ShowNote(string text)
+    /// <param name="fraction">0..1 — how full the bar behind the text is</param>
+    public void ShowNote(string text, double fraction, bool up)
     {
-        _face.Note = text;
+        _face.Note = (up ? "▲ " : "▼ ") + text;
+        _face.NoteFrac = Math.Clamp(fraction, 0, 1);
         _face.NoteUntil = DateTime.Now.AddMilliseconds(1400);
         _lastTalk = DateTime.Now; // light it up while adjusting
     }
@@ -139,6 +141,8 @@ public sealed class MiniOverlay : Window
 
         public string? Note;
         public DateTime NoteUntil = DateTime.MinValue;
+        public double NoteFrac;
+        private double _noteShown;
 
         public void Push(float linear, bool muted)
         {
@@ -156,8 +160,13 @@ public sealed class MiniOverlay : Window
 
             if (Note != null && DateTime.Now < NoteUntil)
             {
-                dc.DrawGeometry(P5.Black, P5.Pen(P5.Red, 2), P5.Slant(plate, 9));
-                var n = P5.Text(this, Note, P5.HeavyItalic, 14, P5.White);
+                // the bar slides towards the new level instead of jumping
+                _noteShown += (NoteFrac - _noteShown) * 0.35;
+                dc.DrawGeometry(P5.Black, null, P5.Slant(plate, 9));
+                double fw = (w - 2) * _noteShown;
+                if (fw > 14) dc.DrawGeometry(P5.DarkRed, null, P5.Slant(new Rect(1, 1, fw, h - 2), 9));
+                dc.DrawGeometry(null, P5.Pen(P5.Red, 2), P5.Slant(plate, 9));
+                var n = P5.Text(this, Note, P5.HeavyItalic, 12, P5.White);
                 dc.DrawText(n, new Point((w - n.Width) / 2, (h - n.Height) / 2));
                 return;
             }
