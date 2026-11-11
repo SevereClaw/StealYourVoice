@@ -52,6 +52,7 @@ public partial class MainWindow
     private bool _spkDragging;
     private bool _dragMic;
     private long _hoverCheck;
+    private bool _swallowUp;
     private double _micGainLocal;
     private DateTime _micGainLast = DateTime.MinValue;
     private int _spkDragX, _spkDragY;
@@ -511,7 +512,36 @@ public partial class MainWindow
             return false;
         }
 
+        // the release that belongs to a click we already took
+        if (msg == MouseHook.WM_LBUTTONUP && _swallowUp)
+        {
+            _swallowUp = false;
+            return true;
+        }
+
         if (msg != MouseHook.WM_LBUTTONDOWN && msg != MouseHook.WM_MOUSEWHEEL) return false;
+
+        // Ctrl + Shift + click on a person → open them in Discord (profile with the message box)
+        if (msg == MouseHook.WM_LBUTTONDOWN && o != null && o.IsVisible &&
+            MouseHook.CtrlDown && MouseHook.ShiftDown && o.Contains(x, y))
+        {
+            var who = o.RowAt(x, y);
+            if (who != null && who != _dcUserId && who.All(char.IsDigit))
+            {
+                _swallowUp = true;
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    try
+                    {
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                            $"discord://-/users/{who}") { UseShellExecute = true });
+                        Audio.Sfx.Play("confirm");
+                    }
+                    catch { /* Discord link handler missing */ }
+                }));
+                return true;
+            }
+        }
 
         // the mic indicator: Shift + drag / Shift + wheel / Ctrl + wheel (your own mic volume)
         var mic = _overlay;
