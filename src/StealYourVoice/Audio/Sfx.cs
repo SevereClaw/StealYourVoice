@@ -15,7 +15,7 @@ public static class Sfx
     public static readonly string Folder =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StealYourVoice", "sounds");
 
-    public static readonly string[] Names = { "hover", "click", "confirm", "cancel", "whoosh" };
+    public static readonly string[] Names = { "hover", "click", "confirm", "cancel", "whoosh", "tab" };
 
     private const int Rate = 44100;
     private static readonly Dictionary<string, SoundPlayer> Players = new();
@@ -68,7 +68,8 @@ public static class Sfx
         "click" => Mix(Blip(1500, 0.035, 0.35, square: true), Noise(0.012, 0.25, 0)),
         "confirm" => Concat(Stab(988, 0.055), Stab(1480, 0.11)),
         "cancel" => Concat(Stab(740, 0.05), Stab(494, 0.10)),
-        "whoosh" => Whoosh(0.32),
+        "whoosh" => Whoosh(0.26),
+        "tab" => SoftPluck(),
         _ => Blip(1000, 0.03, 0.3, false)
     };
 
@@ -118,23 +119,54 @@ public static class Sfx
         return s;
     }
 
-    /// <summary>Band-swept noise: the "slash" across the screen.</summary>
+    /// <summary>
+    /// Soft, dark air swish for the slash transitions. Two low-pass stages keep the hiss out,
+    /// the envelope rises and falls smoothly, and it stays quiet — it should be felt more than heard.
+    /// </summary>
     private static float[] Whoosh(double dur)
     {
         var rnd = new Random(7);
         int n = (int)(dur * Rate);
         var s = new float[n];
-        double lp = 0, hp = 0, prev = 0;
+        double lp1 = 0, lp2 = 0, hp = 0, prev = 0;
         for (int i = 0; i < n; i++)
         {
             double x = (double)i / n;
-            double cutoff = 0.02 + 0.35 * Math.Sin(Math.PI * x);       // sweep up and back down
+            double cutoff = 0.008 + 0.05 * Math.Sin(Math.PI * Math.Pow(x, 0.8)); // gentle sweep, never bright
             double noise = rnd.NextDouble() * 2 - 1;
-            lp += cutoff * (noise - lp);                                  // one-pole low-pass
-            hp = 0.97 * (hp + lp - prev); prev = lp;                      // remove rumble
-            double env = Math.Sin(Math.PI * Math.Pow(x, 0.7));
-            s[i] = (float)(hp * env * 0.9);
+            lp1 += cutoff * (noise - lp1);
+            lp2 += cutoff * (lp1 - lp2);                  // second stage: no fizz on top
+            hp = 0.995 * (hp + lp2 - prev); prev = lp2;   // drop sub-rumble
+            double env = Math.Pow(Math.Sin(Math.PI * x), 2); // smooth in, smooth out — no click at the edges
+            s[i] = (float)(hp * env * 2.6);
         }
+        return Normalize(s, 0.22);
+    }
+
+    /// <summary>Muted wooden "tock" for tabs: a warm sine with a soft attack and a quick, round decay.</summary>
+    private static float[] SoftPluck()
+    {
+        int n = (int)(0.11 * Rate);
+        var s = new float[n];
+        for (int i = 0; i < n; i++)
+        {
+            double t = (double)i / Rate;
+            double f = 440 * (1 + 0.04 * Math.Exp(-t * 80));          // tiny pitch settle
+            double v = Math.Sin(2 * Math.PI * f * t) * 0.8
+                     + Math.Sin(2 * Math.PI * f * 2 * t) * 0.15 * Math.Exp(-t * 60);
+            double env = Math.Min(1, t * 400) * Math.Exp(-t * 32);    // 2.5 ms fade-in, so no click
+            s[i] = (float)(v * env);
+        }
+        return Normalize(s, 0.16);
+    }
+
+    private static float[] Normalize(float[] s, double peak)
+    {
+        float max = 0;
+        foreach (var v in s) max = Math.Max(max, Math.Abs(v));
+        if (max <= 0) return s;
+        var k = (float)(peak / max);
+        for (int i = 0; i < s.Length; i++) s[i] *= k;
         return s;
     }
 

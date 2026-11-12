@@ -59,7 +59,7 @@ public partial class MainWindow
         }
         if (!animate || !changed) return;
 
-        Audio.Sfx.Play("whoosh");
+        Audio.Sfx.Play("tab");
         var page = _pages[idx];
         var move = new TranslateTransform();
         page.RenderTransform = move;
