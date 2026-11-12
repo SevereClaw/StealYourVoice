@@ -53,6 +53,12 @@ public sealed class Settings
     /// </summary>
     public bool CaptionsBus { get; set; }
 
+    /// <summary>
+    /// Record Discord (streams) through B2, but cut it out of B2 while a friend is talking —
+    /// the recording keeps game + streams + you, without friends' voices.
+    /// </summary>
+    public bool StreamsNoVoices { get; set; }
+
     /// <summary>Keyboard volume keys drive the Voicemeeter headphones bus (A1) while Voicemeeter is the default device.</summary>
     public bool VolumeKeys { get; set; } = true;
 

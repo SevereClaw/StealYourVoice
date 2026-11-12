@@ -146,6 +146,60 @@ public partial class MainWindow
         }
     }
 
+    // ───────────────────────── streams into the recording, friends' voices cut out ─────────────────────────
+
+    private bool _streamGateOpen;
+    private DateTime _friendVoiceUntil = DateTime.MinValue;
+
+    private void SetStreamRec(bool on, bool announce)
+    {
+        if (on && _settings.CaptionsBus && CaptionsBusName == "B2")
+        {
+            _settings.CaptionsBus = false;
+            ApplyCaptionsBus(false);
+            CaptionsT.IsChecked = false;
+        }
+        _settings.StreamsNoVoices = on;
+        _settings.Save();
+        StreamRecT.IsChecked = on;
+        if (!_vm.IsConnected || _vm.Type == Voicemeeter.VmType.Standard) return;
+
+        int vin = _vm.HardwareStrips;
+        if (on)
+        {
+            // B2 = you + Discord (gated). Game is taken by the recorder from the default device, so not here twice.
+            _vm.Script($"{S("B2")}=1;Strip[{vin}].B2=0;Strip[{AuxStrip}].B1=0;Strip[{AuxStrip}].B2=0;");
+            _streamGateOpen = false;
+            if (announce)
+                StatusText.Text = _dcAuthed
+                    ? "ЗАПИСЬ: МИКРОФОН = VOICEMEETER OUT B2 // ГОЛОСА ДРУЗЕЙ ВЫРЕЗАЮТСЯ"
+                    : "ПОДКЛЮЧИ «ДРУЗЬЯ» — БЕЗ ЭТОГО НЕ ВИДНО, КТО ГОВОРИТ, И DISCORD В ЗАПИСЬ НЕ ИДЁТ";
+        }
+        else
+        {
+            _vm.Set($"Strip[{AuxStrip}].B2", 0);
+            _streamGateOpen = false;
+            if (announce) StatusText.Text = "ДЕМКИ В ЗАПИСЬ ВЫКЛЮЧЕНЫ";
+        }
+    }
+
+    /// <summary>~30 fps: let Discord into the recording bus only while no friend is talking.</summary>
+    private void StreamGateTick()
+    {
+        if (!_settings.StreamsNoVoices || _vm.Type == Voicemeeter.VmType.Standard) return;
+
+        bool talking = false;
+        foreach (var id in _dcSpeaking)
+            if (id != _dcUserId) { talking = true; break; }
+        var now = DateTime.Now;
+        if (talking) _friendVoiceUntil = now.AddMilliseconds(350); // tail of the last word
+        // without the Discord connection we can't tell voices from streams — keep Discord out to be safe
+        bool open = _dcAuthed && now > _friendVoiceUntil;
+        if (open == _streamGateOpen) return;
+        _streamGateOpen = open;
+        _vm.Set($"Strip[{AuxStrip}].B2", open ? 1 : 0);
+    }
+
     private void InitExtras()
     {
         VolKeysT.IsChecked = _settings.VolumeKeys;
@@ -190,10 +244,15 @@ public partial class MainWindow
         CaptionsT.IsChecked = _settings.CaptionsBus;
         CaptionsT.Click += t =>
         {
+            // on Banana both modes need B2
+            if (t.IsChecked && _settings.StreamsNoVoices && CaptionsBusName == "B2") SetStreamRec(false, false);
             _settings.CaptionsBus = t.IsChecked;
             _settings.Save();
             ApplyCaptionsBus(true);
         };
+
+        StreamRecT.IsChecked = _settings.StreamsNoVoices;
+        StreamRecT.Click += t => SetStreamRec(t.IsChecked, true);
 
         // corner indicator
         _settings.OverlayCorner = Math.Clamp(_settings.OverlayCorner, 0, 4);
@@ -250,6 +309,7 @@ public partial class MainWindow
             _overlay.Push(Math.Max(l, r), MuteT.IsChecked);
         }
 
+        StreamGateTick();
         if (_tick % 15 == 0) FocusTick();
         if (_tick % 90 == 0) GameTick();
     }
@@ -269,10 +329,11 @@ public partial class MainWindow
         FriendsClipsT.IsChecked = _vm.Get($"Strip[{AuxStrip}].B2") >= 0.5f;
 
         // on Banana the subtitles bus is B2, so the B2 clip modes can't be used at the same time
-        bool b2Taken = _settings.CaptionsBus && _vm.Type == Voicemeeter.VmType.Banana;
+        bool b2Taken = (_settings.CaptionsBus && _vm.Type == Voicemeeter.VmType.Banana) || _settings.StreamsNoVoices;
         FriendsClipsT.Visibility = b2Taken ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
         if (b2Taken) GameToB2T.Visibility = System.Windows.Visibility.Collapsed;
         CaptionsT.IsChecked = _settings.CaptionsBus;
+        StreamRecT.IsChecked = _settings.StreamsNoVoices;
         // while ducking lowers AUX, the gain we'd read is the temporary one
         bool auxDucked = _ducker is { Active: true } && _settings.DuckEnabled && _settings.DuckAux && !_settings.DuckFriends;
         if (!auxDucked && !AuxGainS.IsDragging) AuxGainS.Value = _vm.Get($"Strip[{AuxStrip}].Gain");

@@ -974,6 +974,9 @@ public partial class MainWindow : Window
     {
         _timer.Stop();
         _ducker?.Restore();
+        // the gate can't run without us — never leave Discord (with voices) flowing into the recording
+        if (_settings.StreamsNoVoices && _vm.IsConnected && _vm.Type != VmType.Standard)
+            _vm.Set($"Strip[{_vm.HardwareStrips + 1}].B2", 0);
         if (_hwnd != IntPtr.Zero) UnregisterHotKey(_hwnd, HotkeyId);
         _settings.Flush();
         _toast?.Close();

@@ -267,7 +267,21 @@ public partial class MainWindow
                     ? "B2 отдана под субтитры CyberCall. В ShadowPlay и Discord микрофон должен быть Voicemeeter Out B1, не B2."
                     : "B3 отдана под субтитры CyberCall.");
             }
-            else if (_vm.Get($"Strip[{aux}].B2") >= 0.5f)
+            if (_settings.StreamsNoVoices)
+            {
+                if (!_dcAuthed)
+                {
+                    Count(Sev.Warn);
+                    AddRow(Sev.Warn, "«Демки в запись»: панель не подключена к Discord («ДРУЗЬЯ»), поэтому не видит, кто говорит, и звук Discord в запись не пускает.");
+                }
+                else AddRow(Sev.Ok, "«Демки в запись»: звук Discord идёт в B2 и вырезается, пока говорят друзья. В программе записи микрофон должен быть Voicemeeter Out B2.");
+                if (_vm.Get(S("B2")) < 0.5f)
+                {
+                    Count(Sev.Warn);
+                    AddRow(Sev.Warn, "«Демки в запись»: твой голос не идёт в B2 — в записи тебя не будет.", "ГОЛОС В B2", () => _vm.Set(S("B2"), 1));
+                }
+            }
+            else if (!_settings.CaptionsBus && _vm.Get($"Strip[{aux}].B2") >= 0.5f)
                 AddRow(Sev.Info, "Голоса друзей пишутся в клипы (вход AUX идёт в B2). Если это не нужно — убери.",
                     "НЕ ПИСАТЬ ДРУЗЕЙ", () => _vm.Set($"Strip[{aux}].B2", 0));
 

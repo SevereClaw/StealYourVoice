@@ -264,6 +264,8 @@
                                                Hint="Громкость каждого человека в голосовом канале отдельно" />
                                 <c:SlashToggle x:Name="FriendsClipsT" Text="В КЛИПЫ" FontSize="12" Height="32" Tilt="1"
                                                Hint="Записывать голоса друзей в клипы ShadowPlay. Выключено — в клипах только игра и ты. Работает через шину B2: в ShadowPlay микрофон = Voicemeeter Out B2, «Системные звуки» = 0%" />
+                                <c:SlashToggle x:Name="StreamRecT" Text="ДЕМКИ В ЗАПИСЬ, ГОЛОСА НЕТ" FontSize="12" Height="32" Tilt="-0.5"
+                                               Hint="Звук Discord (демки) идёт в запись через B2, но пока кто-то из друзей говорит, панель вырезает Discord из записи. Нужно подключение «ДРУЗЬЯ». В программе записи: микрофон = Voicemeeter Out B2" />
                                 <c:SlashToggle x:Name="CaptionsT" Text="СУБТИТРЫ CYBERCALL" FontSize="12" Height="32" Tilt="0.5"
                                                Hint="Отдать отдельную шину (B2, на Potato — B3) только под голоса друзей: CyberCall слышит их для субтитров, а ShadowPlay и Discord — нет" />
                                 <c:SlashToggle x:Name="DuckFriendsT" Text="ИГРА ТИШЕ ПОД ДРУЗЕЙ" FontSize="12" Height="32" Tilt="-1"
