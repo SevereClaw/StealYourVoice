@@ -248,7 +248,26 @@ public partial class MainWindow
                     "ВКЛЮЧИТЬ A1", () => _vm.Set($"Strip[{aux}].A1", 1));
             }
 
-            if (_vm.Get($"Strip[{aux}].B2") >= 0.5f)
+            if (_settings.CaptionsBus)
+            {
+                var cb = CaptionsBusName;
+                if (_vm.Get($"Strip[{aux}].{cb}") < 0.5f)
+                {
+                    Count(Sev.Warn);
+                    AddRow(Sev.Warn, $"Субтитры CyberCall: Discord не идёт в {cb}, CyberCall не услышит друзей.",
+                        "ИСПРАВИТЬ", () => ApplyCaptionsBus(false));
+                }
+                else if (_vm.Get(S(cb)) >= 0.5f || _vm.Get($"Strip[{_vm.HardwareStrips}].{cb}") >= 0.5f)
+                {
+                    Count(Sev.Warn);
+                    AddRow(Sev.Warn, $"В шину субтитров {cb} попадает не только Discord (твой голос или звук игры).",
+                        "ИСПРАВИТЬ", () => ApplyCaptionsBus(false));
+                }
+                else AddRow(Sev.Ok, cb == "B2"
+                    ? "B2 отдана под субтитры CyberCall. В ShadowPlay и Discord микрофон должен быть Voicemeeter Out B1, не B2."
+                    : "B3 отдана под субтитры CyberCall.");
+            }
+            else if (_vm.Get($"Strip[{aux}].B2") >= 0.5f)
                 AddRow(Sev.Info, "Голоса друзей пишутся в клипы (вход AUX идёт в B2). Если это не нужно — убери.",
                     "НЕ ПИСАТЬ ДРУЗЕЙ", () => _vm.Set($"Strip[{aux}].B2", 0));
 

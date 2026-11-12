@@ -47,6 +47,12 @@ public sealed class Settings
     /// <summary>Switching to / plugging in a mic turns on the preset that was saved with it.</summary>
     public bool MicPresetAuto { get; set; } = true;
 
+    /// <summary>
+    /// A virtual bus (B2 on Banana, B3 on Potato) carries only Discord, so CyberCall can subtitle friends
+    /// while recorders never see that bus.
+    /// </summary>
+    public bool CaptionsBus { get; set; }
+
     /// <summary>Keyboard volume keys drive the Voicemeeter headphones bus (A1) while Voicemeeter is the default device.</summary>
     public bool VolumeKeys { get; set; } = true;
 

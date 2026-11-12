@@ -108,6 +108,32 @@ public partial class MainWindow
         return true;
     }
 
+    /// <summary>Which virtual bus is free for CyberCall: B3 exists only on Potato, otherwise B2.</summary>
+    private string CaptionsBusName => _vm.Type == Voicemeeter.VmType.Potato ? "B3" : "B2";
+
+    private void ApplyCaptionsBus(bool announce)
+    {
+        if (!_vm.IsConnected || _vm.Type == Voicemeeter.VmType.Standard) return;
+        int vin = _vm.HardwareStrips;
+        var bus = CaptionsBusName;
+        if (_settings.CaptionsBus)
+        {
+            // only Discord on that bus: no game, no you; and Discord never into B1 (your mic)
+            var script = $"Strip[{AuxStrip}].{bus}=1;Strip[{AuxStrip}].B1=0;Strip[{vin}].{bus}=0;";
+            for (int i = 0; i < _vm.HardwareStrips; i++) script += $"Strip[{i}].{bus}=0;";
+            _vm.Script(script);
+            if (announce)
+                StatusText.Text = bus == "B2"
+                    ? "B2 = СУБТИТРЫ // SHADOWPLAY И DISCORD: МИКРОФОН = OUT B1"
+                    : "B3 = СУБТИТРЫ // CYBERCALL САМ НАЙДЁТ OUT B3";
+        }
+        else
+        {
+            _vm.Set($"Strip[{AuxStrip}].{bus}", 0);
+            if (announce) StatusText.Text = "ШИНА СУБТИТРОВ ВЫКЛЮЧЕНА";
+        }
+    }
+
     private void InitExtras()
     {
         VolKeysT.IsChecked = _settings.VolumeKeys;
@@ -146,6 +172,15 @@ public partial class MainWindow
                 _vm.Script($"Strip[{AuxStrip}].B2=0;");
                 StatusText.Text = "ДРУЗЬЯ НЕ ПИШУТСЯ В КЛИПЫ";
             }
+        };
+
+        // a bus that carries only Discord → CyberCall subtitles, never recorded
+        CaptionsT.IsChecked = _settings.CaptionsBus;
+        CaptionsT.Click += t =>
+        {
+            _settings.CaptionsBus = t.IsChecked;
+            _settings.Save();
+            ApplyCaptionsBus(true);
         };
 
         // corner indicator
@@ -220,6 +255,12 @@ public partial class MainWindow
         DiscordPanel.Visibility = hasAux ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
         if (!hasAux) return;
         FriendsClipsT.IsChecked = _vm.Get($"Strip[{AuxStrip}].B2") >= 0.5f;
+
+        // on Banana the subtitles bus is B2, so the B2 clip modes can't be used at the same time
+        bool b2Taken = _settings.CaptionsBus && _vm.Type == Voicemeeter.VmType.Banana;
+        FriendsClipsT.Visibility = b2Taken ? Visibility.Collapsed : Visibility.Visible;
+        if (b2Taken) GameToB2T.Visibility = Visibility.Collapsed;
+        CaptionsT.IsChecked = _settings.CaptionsBus;
         // while ducking lowers AUX, the gain we'd read is the temporary one
         bool auxDucked = _ducker is { Active: true } && _settings.DuckEnabled && _settings.DuckAux && !_settings.DuckFriends;
         if (!auxDucked && !AuxGainS.IsDragging) AuxGainS.Value = _vm.Get($"Strip[{AuxStrip}].Gain");
