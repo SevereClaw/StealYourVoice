@@ -363,11 +363,11 @@ public partial class MainWindow : Window
         PresetPanel.Children.Clear();
 
         AddPresetButton("ЧИСТЫЙ", "Шумодав 3, компрессор 4, моно", -1.5,
-            () => _vm.Script($"{S("Gate")}=3;{S("Comp")}=4;{S("Mono")}=1;"));
+            () => { _vm.Script($"{S("Gate")}=3;{S("Comp")}=4;{S("Mono")}=1;"); ShowPresetBanner("ПРЕСЕТ ВКЛЮЧЁН", "ЧИСТЫЙ"); });
         AddPresetButton("СТРИМ", "Шумодав 4.5, компрессор 6.5, моно — ровный голос поверх игры", 1,
-            () => _vm.Script($"{S("Gate")}=4.5;{S("Comp")}=6.5;{S("Mono")}=1;"));
+            () => { _vm.Script($"{S("Gate")}=4.5;{S("Comp")}=6.5;{S("Mono")}=1;"); ShowPresetBanner("ПРЕСЕТ ВКЛЮЧЁН", "СТРИМ"); });
         AddPresetButton("СЫРОЙ", "Без обработки", -0.5,
-            () => _vm.Script($"{S("Gate")}=0;{S("Comp")}=0;"));
+            () => { _vm.Script($"{S("Gate")}=0;{S("Comp")}=0;"); ShowPresetBanner("ПРЕСЕТ ВКЛЮЧЁН", "СЫРОЙ"); });
 
         var rnd = new Random(42);
         foreach (var p in _settings.Presets)
@@ -478,8 +478,10 @@ public partial class MainWindow : Window
         _vm.SetStripDevice(_strip, dev);
     }
 
-    private void ApplyUserPreset(UserPreset p)
+    private void ApplyUserPreset(UserPreset p, string? reason = null)
     {
+        // unnamed = the snapshot we restore when the bound programs close; that one announces itself separately
+        if (!string.IsNullOrEmpty(p.Name)) ShowPresetBanner(reason ?? "ПРЕСЕТ ВКЛЮЧЁН", p.Name.ToUpperInvariant());
         ApplyPresetDevice(p);
         _vm.Script(
             $"{S("Gain")}={VmClient.F(p.Gain)};" +
@@ -973,6 +975,7 @@ public partial class MainWindow : Window
         foreach (var d in _detached.Values) d.Close();
         _mouseHook?.Dispose();
         _joinToast?.Close();
+        _presetToast?.Close();
         if (_tray != null) { _tray.Visible = false; _tray.Dispose(); }
         _vm.Dispose();
         base.OnClosed(e);

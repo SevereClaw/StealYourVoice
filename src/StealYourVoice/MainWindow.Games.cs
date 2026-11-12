@@ -227,6 +227,16 @@ public partial class MainWindow
 
     // ───────────────────────── presets bound to games ─────────────────────────
 
+    private BannerToast? _presetToast;
+
+    /// <summary>Animated "preset switched" banner over whatever is on screen.</summary>
+    private void ShowPresetBanner(string label, string title, bool off = false)
+    {
+        _presetToast ??= new BannerToast(118);
+        _presetToast.Pop(label, title.Length > 22 ? title[..21] + "…" : title, null, off, false);
+        Audio.Sfx.Play("whoosh");
+    }
+
     private static string PresetTitle(UserPreset p) =>
         "★ " + p.Name.ToUpperInvariant() + (string.IsNullOrEmpty(p.Process) ? "" : $" [{p.Process.ToUpperInvariant()}]");
 
@@ -349,7 +359,7 @@ public partial class MainWindow
         if (hit == null) return;
 
         if (_activeGame == null) _beforeGame = CaptureCurrent(""); // what to return to when they all close
-        ApplyUserPreset(hit);
+        ApplyUserPreset(hit, $"{hit.Process!.ToUpperInvariant()} В ФОКУСЕ");
         _activeGame = hit.Process;
         StatusText.Text = $"{hit.Process!.ToUpperInvariant()} В ФОКУСЕ // ПРЕСЕТ «{hit.Name.ToUpperInvariant()}»";
     }
@@ -371,6 +381,7 @@ public partial class MainWindow
             {
                 ApplyUserPreset(_beforeGame);
                 _beforeGame = null;
+                ShowPresetBanner("ПРОГРАММЫ С ПРЕСЕТАМИ ЗАКРЫТЫ", "ПРЕЖНИЕ НАСТРОЙКИ", true);
                 StatusText.Text = "ПРОГРАММЫ С ПРЕСЕТАМИ ЗАКРЫТЫ // ВЕРНУЛ ПРЕЖНИЕ НАСТРОЙКИ";
             }
         }

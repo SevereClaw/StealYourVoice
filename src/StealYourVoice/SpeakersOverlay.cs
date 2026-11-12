@@ -474,7 +474,7 @@ public sealed class SpeakersOverlay : Window
         return row;
     }
 
-    private static BitmapImage? LoadAvatar(string? url)
+    internal static BitmapImage? LoadAvatar(string? url)
     {
         if (string.IsNullOrEmpty(url)) return null;
         if (AvatarCache.TryGetValue(url, out var cached)) return cached;

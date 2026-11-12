@@ -43,7 +43,7 @@ public partial class MainWindow
     private string? _dragPerson;
     private bool _dcSelfInChannel;
     private MouseHook? _mouseHook;
-    private MicToast? _joinToast;
+    private BannerToast? _joinToast;
     private string? _dcOutputName;
     private readonly Dictionary<string, int> _dcLoud = new();
     private readonly Dictionary<string, double> _lvlAvg = new();
@@ -721,11 +721,11 @@ public partial class MainWindow
         bool isJoin = joined.Count > 0;
         var ids = isJoin ? joined : left;
         var name = _dcNames.GetValueOrDefault(ids[0], "КТО-ТО");
-        if (name.Length > 16) name = name[..15] + "…";
-        var text = name.ToUpperInvariant() + (ids.Count > 1 ? $" +{ids.Count - 1}" : "") + (isJoin ? " ЗАШЁЛ" : " ВЫШЕЛ");
+        if (name.Length > 20) name = name[..19] + "…";
+        var title = name.ToUpperInvariant() + (ids.Count > 1 ? $"  +{ids.Count - 1}" : "");
 
-        _joinToast ??= new MicToast();
-        _joinToast.Flash(text, !isJoin);
+        _joinToast ??= new BannerToast(30);
+        _joinToast.Pop(isJoin ? "ЗАШЁЛ В КАНАЛ" : "ВЫШЕЛ ИЗ КАНАЛА", title, _dcAvatars.GetValueOrDefault(ids[0]), !isJoin, true);
         Audio.Sfx.Play(isJoin ? "confirm" : "cancel");
     }
 
