@@ -970,6 +970,7 @@ public partial class MainWindow : Window
         _overlay?.Close();
         _dc?.Dispose();
         _speakers?.Close();
+        foreach (var d in _detached.Values) d.Close();
         _mouseHook?.Dispose();
         _joinToast?.Close();
         if (_tray != null) { _tray.Visible = false; _tray.Dispose(); }

@@ -12,7 +12,7 @@ using StealYourVoice.Controls;
 
 namespace StealYourVoice;
 
-public record SpeakerInfo(string Id, string Name, string? Avatar, bool MicOff, bool Deaf);
+public record SpeakerInfo(string Id, string Name, string? Avatar, bool MicOff, bool Deaf, bool Live = false, bool Camera = false);
 
 public record SpeakerStyle(bool OnlyTalking, double SilentOpacity, double Scale, bool AvatarsOnly);
 
@@ -357,6 +357,18 @@ public sealed class SpeakersOverlay : Window
         Margin = margin
     };
 
+    private static Border TextBadge(string text, Brush background, Brush foreground) => new()
+    {
+        Background = background,
+        Margin = new Thickness(2, 0, 2, 0),
+        VerticalAlignment = VerticalAlignment.Center,
+        Child = new TextBlock
+        {
+            Text = text, FontFamily = Font, FontSize = 9, Foreground = foreground,
+            Margin = new Thickness(4, 0, 4, 1)
+        }
+    };
+
     private static Row BuildRow(SpeakerInfo m, bool right, SpeakerStyle style)
     {
         var row = new Row();
@@ -377,9 +389,11 @@ public sealed class SpeakersOverlay : Window
         }
 
         StackPanel? badges = null;
-        if (m.MicOff || m.Deaf)
+        if (m.MicOff || m.Deaf || m.Live || m.Camera)
         {
             badges = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            if (m.Live) badges.Children.Add(TextBadge("LIVE", P5.Red, P5.White));
+            if (m.Camera) badges.Children.Add(TextBadge("CAM", P5.White, P5.Black));
             if (m.MicOff) badges.Children.Add(new StatusIcon(false));
             if (m.Deaf) badges.Children.Add(new StatusIcon(true));
         }

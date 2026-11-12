@@ -317,11 +317,13 @@
                                            Hint="Ты сам первой строкой, со значком выключенного микрофона при mute" />
                             <c:SlashToggle x:Name="SpkLoudT" Text="ТИХО / ГРОМКО" Height="32" FontSize="12" Tilt="1"
                                            Hint="Помечать в списке тех, кто говорит заметно тише или громче нормы: «ТИХО» мигает, «ГРОМКО» трясёт плашку. Нужен вывод Discord в Voicemeeter AUX Input" />
+                            <c:SlashToggle x:Name="SpkGatherBtn" Text="СОБРАТЬ ВСЕХ В СПИСОК" IsToggle="False" Height="32" FontSize="12"
+                                           Hint="Вернуть в общий список всех, кого ты вытащил отдельно (Ctrl + тащить)" />
                             <c:SlashToggle x:Name="SpkJoinT" Text="ВХОД / ВЫХОД" Height="32" FontSize="12" Tilt="-1"
                                            Hint="Плашка вверху экрана «ИМЯ ЗАШЁЛ / ВЫШЕЛ», когда кто-то заходит в твой голосовой канал или выходит" />
                         </WrapPanel>
                         <TextBlock Foreground="#9A9A9A" FontSize="12" TextWrapping="Wrap" Margin="2,0,0,8"
-                                   Text="Прямо в игре: зажми Shift и тащи список мышкой — подвинуть. Shift + колёсико над списком — размер. Ctrl + колёсико над человеком — его громкость. Ctrl + Shift + клик по человеку — открыть его в Discord. Кнопка угла возвращает список в угол." />
+                                   Text="Прямо в игре: зажми Shift и тащи список мышкой — подвинуть. Shift + колёсико над списком — размер. Ctrl + колёсико над человеком — его громкость. Ctrl + тащить человека — вытащить его из списка и поставить отдельно. Ctrl + Shift + клик по человеку — открыть его в Discord. Кнопка угла возвращает список в угол." />
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />

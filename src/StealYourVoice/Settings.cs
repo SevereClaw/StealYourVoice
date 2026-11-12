@@ -83,6 +83,9 @@ public sealed class Settings
     public double? SpeakersX { get; set; }
     public double? SpeakersY { get; set; }
 
+    /// <summary>People pulled out of the list and parked on their own: user id → [x, y].</summary>
+    public Dictionary<string, double[]> SpeakerPositions { get; set; } = new();
+
     private static readonly string Dir =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StealYourVoice");
     private static readonly string FilePath = Path.Combine(Dir, "settings.json");

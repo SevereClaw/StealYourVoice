@@ -37,7 +37,10 @@ public partial class MainWindow
     private readonly Dictionary<string, string> _dcNames = new();
     private readonly Dictionary<string, string> _dcAvatars = new();
     private List<string> _dcCurrent = new();
-    private readonly Dictionary<string, (bool MicOff, bool Deaf)> _dcFlags = new();
+    private readonly Dictionary<string, (bool MicOff, bool Deaf, bool Live, bool Cam)> _dcFlags = new();
+    private readonly Dictionary<string, SpeakersOverlay> _detached = new();
+    private SpeakersOverlay? _dragOverlay;
+    private string? _dragPerson;
     private bool _dcSelfInChannel;
     private MouseHook? _mouseHook;
     private MicToast? _joinToast;
@@ -114,6 +117,7 @@ public partial class MainWindow
         {
             _settings.SpeakersCorner = (_settings.SpeakersCorner + 1) % 5;
             _settings.SpeakersX = _settings.SpeakersY = null; // back to a corner
+            _settings.SpeakerPositions.Clear();
             _settings.Save();
             SpeakersBtn.Text = "КТО ГОВОРИТ: " + CornerNames[_settings.SpeakersCorner];
             UpdateSpeakers();
@@ -125,6 +129,12 @@ public partial class MainWindow
         SpkSelfT.IsChecked = _settings.SpeakersShowSelf;
         SpkLoudT.IsChecked = _settings.SpeakersLoudness;
         SpkLoudT.Click += t => { _settings.SpeakersLoudness = t.IsChecked; _settings.Save(); UpdateSpeakers(); };
+        SpkGatherBtn.Click += _ =>
+        {
+            _settings.SpeakerPositions.Clear();
+            _settings.Save();
+            UpdateSpeakers();
+        };
         SpkJoinT.IsChecked = _settings.JoinLeaveToasts;
         SpkJoinT.Click += t => { _settings.JoinLeaveToasts = t.IsChecked; _settings.Save(); };
         SpkOpacityS.Value = Math.Round(_settings.SpeakersSilentOpacity * 100);
@@ -366,13 +376,15 @@ public partial class MainWindow
                     var name = CleanName(DiscordRpc.Str(vs, "nick")) ?? CleanName(DiscordRpc.Str(user, "global_name"))
                                ?? CleanName(DiscordRpc.Str(user, "username")) ?? id;
 
-                    bool micOff = false, deaf = false;
+                    bool micOff = false, deaf = false, live = false, cam = false;
                     if (vs.TryGetProperty("voice_state", out var st) && st.ValueKind == JsonValueKind.Object)
                     {
                         micOff = DcFlag(st, "self_mute") || DcFlag(st, "mute") || DcFlag(st, "suppress");
                         deaf = DcFlag(st, "self_deaf") || DcFlag(st, "deaf");
+                        live = DcFlag(st, "self_stream");
+                        cam = DcFlag(st, "self_video");
                     }
-                    _dcFlags[id] = (micOff, deaf);
+                    _dcFlags[id] = (micOff, deaf, live, cam);
 
                     if (id == _dcUserId)
                     {
@@ -391,7 +403,7 @@ public partial class MainWindow
                         DcSetUser(id, saved, null);
                         vol = saved;
                     }
-                    if (mute) _dcFlags[id] = (true, deaf); // muted by you
+                    if (mute) _dcFlags[id] = (true, deaf, live, cam); // muted by you
                     _dcNames[id] = name;
                     _dcAvatars[id] = AvatarUrl(id, DiscordRpc.Str(user, "avatar"));
                     friends.Add((id, name, vol, mute));
@@ -448,21 +460,40 @@ public partial class MainWindow
             _mouseHook = null;
             _spkDragging = false;
             _dragMic = false;
+            _dragOverlay = null;
+            _dragPerson = null;
         }
     }
 
-    /// <summary>Shift + drag moves the list, Shift + wheel over it resizes. Returns true to swallow the event.</summary>
+    /// <summary>The shared list plus every plate that was pulled out of it.</summary>
+    private IEnumerable<SpeakersOverlay> AllLists()
+    {
+        if (_speakers != null) yield return _speakers;
+        foreach (var d in _detached.Values) yield return d;
+    }
+
+    private SpeakersOverlay? ListAt(int x, int y)
+    {
+        foreach (var l in AllLists())
+            if (l.IsVisible && l.Contains(x, y)) return l;
+        return null;
+    }
+
+    /// <summary>
+    /// Mouse over the click-through overlays. Hover spreads the list; Shift + drag / wheel moves and resizes;
+    /// Ctrl + wheel is volume; Ctrl + drag pulls one person out; Ctrl + Shift + click opens them in Discord.
+    /// Returns true to swallow the event.
+    /// </summary>
     private bool OnGlobalMouse(int msg, int x, int y, int delta)
     {
-        var o = _speakers;
-
         // plain mouse movement: hovering a plate spreads the list and shows the full nickname
         if (msg == MouseHook.WM_MOUSEMOVE && !_spkDragging)
         {
             long now = Environment.TickCount64;
             if (now - _hoverCheck < 40) return false;
             _hoverCheck = now;
-            if (o != null && o.IsVisible) o.SetHover(o.Contains(x, y) ? o.RowAt(x, y) : null);
+            foreach (var l in AllLists())
+                if (l.IsVisible) l.SetHover(l.Contains(x, y) ? l.RowAt(x, y) : null);
             return false;
         }
 
@@ -492,19 +523,44 @@ public partial class MainWindow
 
         if (_spkDragging)
         {
-            if (msg == MouseHook.WM_MOUSEMOVE && o != null)
+            if (msg == MouseHook.WM_MOUSEMOVE)
             {
-                var k = o.DpiScale;
-                o.MoveTo(_spkStartLeft + (x - _spkDragX) / k, _spkStartTop + (y - _spkDragY) / k);
+                if (_dragPerson != null && _dragOverlay == null)
+                {
+                    // Ctrl + drag from the shared list: the person pops out once the mouse really moves
+                    if (Math.Abs(x - _spkDragX) + Math.Abs(y - _spkDragY) < 6) return false;
+                    double k0 = _speakers?.DpiScale ?? 1;
+                    _spkStartLeft = _spkDragX / k0 - 24;
+                    _spkStartTop = _spkDragY / k0 - 20;
+                    _settings.SpeakerPositions[_dragPerson] = new[] { _spkStartLeft, _spkStartTop };
+                    UpdateSpeakers();
+                    _detached.TryGetValue(_dragPerson, out _dragOverlay);
+                    if (_dragOverlay == null) { _spkDragging = false; _dragPerson = null; return false; }
+                    Audio.Sfx.Play("whoosh");
+                }
+                var d = _dragOverlay;
+                if (d != null)
+                {
+                    var k = d.DpiScale;
+                    d.MoveTo(_spkStartLeft + (x - _spkDragX) / k, _spkStartTop + (y - _spkDragY) / k);
+                }
                 return false;
             }
             if (msg == MouseHook.WM_LBUTTONUP)
             {
+                var d = _dragOverlay;
+                var person = _dragPerson;
                 _spkDragging = false;
-                if (o?.CustomPos is { } p)
+                _dragOverlay = null;
+                _dragPerson = null;
+                if (d?.CustomPos is { } p)
                 {
-                    _settings.SpeakersX = p.X;
-                    _settings.SpeakersY = p.Y;
+                    if (person != null) _settings.SpeakerPositions[person] = new[] { p.X, p.Y };
+                    else
+                    {
+                        _settings.SpeakersX = p.X;
+                        _settings.SpeakersY = p.Y;
+                    }
                     _settings.Save();
                 }
                 return true;
@@ -521,11 +577,15 @@ public partial class MainWindow
 
         if (msg != MouseHook.WM_LBUTTONDOWN && msg != MouseHook.WM_MOUSEWHEEL) return false;
 
+        bool ctrl = MouseHook.CtrlDown, shift = MouseHook.ShiftDown;
+        if (!ctrl && !shift) return false; // without a modifier everything passes straight through to the game
+
+        var list = ListAt(x, y);
+
         // Ctrl + Shift + click on a person → open them in Discord (profile with the message box)
-        if (msg == MouseHook.WM_LBUTTONDOWN && o != null && o.IsVisible &&
-            MouseHook.CtrlDown && MouseHook.ShiftDown && o.Contains(x, y))
+        if (msg == MouseHook.WM_LBUTTONDOWN && list != null && ctrl && shift)
         {
-            var who = o.RowAt(x, y);
+            var who = list.RowAt(x, y);
             if (who != null && who != _dcUserId && who.All(char.IsDigit))
             {
                 _swallowUp = true;
@@ -545,9 +605,9 @@ public partial class MainWindow
 
         // the mic indicator: Shift + drag / Shift + wheel / Ctrl + wheel (your own mic volume)
         var mic = _overlay;
-        if (mic != null && mic.IsVisible && (MouseHook.ShiftDown || MouseHook.CtrlDown) && mic.Contains(x, y))
+        if (mic != null && mic.IsVisible && mic.Contains(x, y))
         {
-            if (MouseHook.ShiftDown)
+            if (shift)
             {
                 if (msg == MouseHook.WM_LBUTTONDOWN)
                 {
@@ -582,30 +642,58 @@ public partial class MainWindow
             return false;
         }
 
-        // Ctrl + wheel over a person → that person's volume
-        if (msg == MouseHook.WM_MOUSEWHEEL && o != null && o.IsVisible && MouseHook.CtrlDown && !MouseHook.ShiftDown && o.Contains(x, y))
+        if (list == null) return false;
+
+        if (ctrl && !shift)
         {
-            var id = o.RowAt(x, y);
-            if (id == null || id == _dcUserId || !_dcAuthed) return id != null;
-            double current = _dcRows.TryGetValue(id, out var fr) ? fr.Slider.Value : _settings.FriendVolumes.GetValueOrDefault(id, 100);
-            int vol = (int)Math.Clamp(Math.Round(current / 5) * 5 + Math.Sign(delta) * 5, 0, 200);
-            _dcLastTouch = DateTime.Now;
-            _settings.FriendVolumes[id] = vol;
-            _dcSettingsDirty = true;
-            if (fr != null) fr.Slider.Value = vol;
-            DcSetUser(id, vol, null);
-            o.ShowVolume(id, vol);
+            var id = list.RowAt(x, y);
+            if (id == null) return false;
+
+            if (msg == MouseHook.WM_MOUSEWHEEL)
+            {
+                // Ctrl + wheel over a person → that person's volume
+                if (id == _dcUserId || !_dcAuthed) return true;
+                double current = _dcRows.TryGetValue(id, out var fr) ? fr.Slider.Value : _settings.FriendVolumes.GetValueOrDefault(id, 100);
+                int vol = (int)Math.Clamp(Math.Round(current / 5) * 5 + Math.Sign(delta) * 5, 0, 200);
+                _dcLastTouch = DateTime.Now;
+                _settings.FriendVolumes[id] = vol;
+                _dcSettingsDirty = true;
+                if (fr != null) fr.Slider.Value = vol;
+                DcSetUser(id, vol, null);
+                list.ShowVolume(id, vol);
+                return true;
+            }
+
+            // Ctrl + drag → this one person, on their own
+            _spkDragging = true;
+            _dragPerson = id;
+            _spkDragX = x;
+            _spkDragY = y;
+            if (ReferenceEquals(list, _speakers)) _dragOverlay = null; // pops out on the first real movement
+            else
+            {
+                _dragOverlay = list;
+                _spkStartLeft = list.Left;
+                _spkStartTop = list.Top;
+            }
             return true;
         }
-        if (o == null || !o.IsVisible || !MouseHook.ShiftDown || !o.Contains(x, y)) return false;
+
+        if (!shift) return false;
 
         if (msg == MouseHook.WM_LBUTTONDOWN)
         {
+            // Shift + drag → the whole list, or a parked plate
             _spkDragging = true;
+            _dragOverlay = list;
+            _dragPerson = null;
+            if (!ReferenceEquals(list, _speakers))
+                foreach (var kv in _detached)
+                    if (ReferenceEquals(kv.Value, list)) _dragPerson = kv.Key;
             _spkDragX = x;
             _spkDragY = y;
-            _spkStartLeft = o.Left;
-            _spkStartTop = o.Top;
+            _spkStartLeft = list.Left;
+            _spkStartTop = list.Top;
             return true;
         }
 
@@ -731,31 +819,65 @@ public partial class MainWindow
     private void UpdateSpeakers()
     {
         SyncMouseHook();
-        if (_settings.SpeakersCorner == 0) { _speakers?.Hide(); return; }
+        if (_settings.SpeakersCorner == 0)
+        {
+            _speakers?.Hide();
+            foreach (var d in _detached.Values) d.Hide();
+            return;
+        }
+
         var members = new List<SpeakerInfo>();
         if (_settings.SpeakersShowSelf && _dcSelfInChannel && _dcUserId != null)
         {
             var f = _dcFlags.GetValueOrDefault(_dcUserId);
             // your real mute is the one in Voicemeeter, so it counts too
             members.Add(new SpeakerInfo(_dcUserId, _dcNames.GetValueOrDefault(_dcUserId, "ТЫ"),
-                _dcAvatars.GetValueOrDefault(_dcUserId), f.MicOff || MuteT.IsChecked, f.Deaf));
+                _dcAvatars.GetValueOrDefault(_dcUserId), f.MicOff || MuteT.IsChecked, f.Deaf, f.Live, f.Cam));
         }
         foreach (var id in _dcCurrent)
         {
             var f = _dcFlags.GetValueOrDefault(id);
-            members.Add(new SpeakerInfo(id, _dcNames.GetValueOrDefault(id, id), _dcAvatars.GetValueOrDefault(id), f.MicOff, f.Deaf));
+            members.Add(new SpeakerInfo(id, _dcNames.GetValueOrDefault(id, id), _dcAvatars.GetValueOrDefault(id),
+                f.MicOff, f.Deaf, f.Live, f.Cam));
         }
-        if (members.Count == 0 && _speakers == null) return;
+
+        var style = new SpeakerStyle(_settings.SpeakersOnlyTalking, _settings.SpeakersSilentOpacity,
+            _settings.SpeakersScale, _settings.SpeakersAvatarsOnly);
+        var loud = _settings.SpeakersLoudness ? _dcLoud : NoLoudness;
+
+        // people parked on their own get a little window each; the rest stay in the shared list
+        var attached = new List<SpeakerInfo>();
+        var parked = new HashSet<string>();
+        foreach (var m in members)
+        {
+            if (!_settings.SpeakerPositions.TryGetValue(m.Id, out var pos) || pos.Length != 2)
+            {
+                attached.Add(m);
+                continue;
+            }
+            parked.Add(m.Id);
+            if (!_detached.TryGetValue(m.Id, out var d)) _detached[m.Id] = d = new SpeakersOverlay();
+            // while it is being dragged the live position wins over the saved one
+            var at = ReferenceEquals(d, _dragOverlay) && d.CustomPos is { } live ? live : new Point(pos[0], pos[1]);
+            d.SetMembers(new[] { m }, 1, 0, style, at);
+            d.SetSpeaking(_dcSpeaking);
+            d.SetLoudness(loud, _dcSpeaking);
+        }
+        foreach (var gone in _detached.Keys.Where(k => !parked.Contains(k)).ToList())
+        {
+            _detached[gone].Close();
+            _detached.Remove(gone);
+        }
+
+        if (attached.Count == 0 && _speakers == null) return;
         _speakers ??= new SpeakersOverlay();
         // same corner as the mic indicator → sit right next to it instead of on top
         bool shared = _settings.OverlayCorner == _settings.SpeakersCorner;
-        _speakers.SetMembers(members, _settings.SpeakersCorner, shared ? 36 : 0,
-            new SpeakerStyle(_settings.SpeakersOnlyTalking, _settings.SpeakersSilentOpacity,
-                _settings.SpeakersScale, _settings.SpeakersAvatarsOnly),
+        _speakers.SetMembers(attached, _settings.SpeakersCorner, shared ? 36 : 0, style,
             _settings.SpeakersX.HasValue && _settings.SpeakersY.HasValue
                 ? new Point(_settings.SpeakersX.Value, _settings.SpeakersY.Value) : null);
         _speakers.SetSpeaking(_dcSpeaking);
-        _speakers.SetLoudness(_settings.SpeakersLoudness ? _dcLoud : NoLoudness, _dcSpeaking);
+        _speakers.SetLoudness(loud, _dcSpeaking);
     }
 
     private void DcSetFriends(List<(string Id, string Name, int Volume, bool Mute)> friends)
