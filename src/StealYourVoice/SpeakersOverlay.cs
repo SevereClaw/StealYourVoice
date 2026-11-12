@@ -41,6 +41,8 @@ public sealed class SpeakersOverlay : Window
         public int LastVol = -1;
     }
 
+    private static readonly Brush MuteShade = P5.Freeze(new SolidColorBrush(Color.FromArgb(0xB4, 0x0A, 0x0A, 0x0A)));
+    private static readonly Brush MuteShadeRed = P5.Freeze(new SolidColorBrush(Color.FromArgb(0xC8, 0xE6, 0x00, 0x12)));
     private static readonly FontFamily Font = new("Arial Black, Segoe UI, Segoe UI Symbol");
     private static readonly Thickness Rest = new(0, 2, 0, 2);
     private static readonly Thickness Spread = new(0, 10, 0, 10);
@@ -312,7 +314,7 @@ public sealed class SpeakersOverlay : Window
     {
         if (!_rows.TryGetValue(id, out var r)) return;
         r.MuteIcon.Crossed = muted;
-        r.MuteBtn.Background = muted ? P5.Red : P5.Black;
+        r.MuteBtn.Background = muted ? MuteShadeRed : MuteShade;
         var kick = new DoubleAnimation(1.4, 1, TimeSpan.FromMilliseconds(240))
             { EasingFunction = new BackEase { Amplitude = 0.6, EasingMode = EasingMode.EaseOut } };
         r.MutePop.BeginAnimation(ScaleTransform.ScaleXProperty, kick);
@@ -477,20 +479,20 @@ public sealed class SpeakersOverlay : Window
         // Alt + hover: mute this person only for you
         row.MuteIcon = new StatusIcon(false) { Crossed = m.MicOff };
         row.MutePop = new ScaleTransform(1, 1);
+        // sits right on top of the avatar, darkening it so the mic reads clearly
+        row.MuteIcon.HorizontalAlignment = HorizontalAlignment.Center;
+        row.MuteIcon.VerticalAlignment = VerticalAlignment.Center;
+        row.MuteIcon.Margin = new Thickness(0);
         row.MuteBtn = new Border
         {
             Child = row.MuteIcon,
-            Background = P5.Black,
+            Background = MuteShade,
             BorderBrush = P5.Red,
             BorderThickness = new Thickness(2),
-            Padding = new Thickness(5, 4, 5, 4),
-            Margin = new Thickness(8, 0, 0, 0),
-            VerticalAlignment = VerticalAlignment.Center,
             Visibility = Visibility.Collapsed,
             RenderTransformOrigin = new Point(0.5, 0.5),
             RenderTransform = row.MutePop
         };
-        line.Children.Add(row.MuteBtn);
 
         if (!style.AvatarsOnly)
         {
@@ -546,6 +548,8 @@ public sealed class SpeakersOverlay : Window
         row.VolPanel.Children.Add(bar);
         row.VolPanel.Children.Add(row.VolText);
         line.Children.Add(row.VolPanel);
+
+        avatar.Children.Add(row.MuteBtn); // last, so it covers the picture and any badges
 
         row.Scale = new ScaleTransform(1, 1);
         row.Move = new TranslateTransform();
