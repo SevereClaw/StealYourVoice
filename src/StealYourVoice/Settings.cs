@@ -21,6 +21,9 @@ public sealed class UserPreset
     public string DeviceName { get; set; } = "";
     public string DeviceKind { get; set; } = ""; // wdm / mme / ks
 
+    /// <summary>When this preset was last switched on (picks between several presets of the same mic).</summary>
+    public DateTime LastUsed { get; set; }
+
     /// <summary>Process name (without .exe) that auto-applies this preset while it runs.</summary>
     public string? Process { get; set; }
 }
@@ -37,6 +40,12 @@ public sealed class Settings
 
     public bool ShowToast { get; set; } = true;
     public bool SoundsEnabled { get; set; } = true;
+
+    /// <summary>Last open tab of the main window.</summary>
+    public int Tab { get; set; }
+
+    /// <summary>Switching to / plugging in a mic turns on the preset that was saved with it.</summary>
+    public bool MicPresetAuto { get; set; } = true;
 
     /// <summary>Keyboard volume keys drive the Voicemeeter headphones bus (A1) while Voicemeeter is the default device.</summary>
     public bool VolumeKeys { get; set; } = true;

@@ -73,21 +73,28 @@
                 </Border>
             </DockPanel>
 
-            <!-- Main cards -->
-            <Grid Grid.Row="2">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.35*" />
-                    <ColumnDefinition Width="26" />
-                    <ColumnDefinition Width="1*" />
-                </Grid.ColumnDefinitions>
+            <!-- Tabs -->
+            <WrapPanel x:Name="TabBar" Grid.Row="2" Margin="2,4,0,10">
+                <c:SlashToggle x:Name="TabVoice" Text="ГОЛОС" Sound="" FontSize="16" Height="38" Tilt="-1.5" Hint="Микрофон, пресеты, запись" />
+                <c:SlashToggle x:Name="TabSound" Text="ЗВУК" Sound="" FontSize="16" Height="38" Tilt="1" Hint="Громкость игры и наушников, автоприглушение" />
+                <c:SlashToggle x:Name="TabDiscord" Text="DISCORD" Sound="" FontSize="16" Height="38" Tilt="-0.5" Hint="Друзья, их громкость, список поверх игры" />
+                <c:SlashToggle x:Name="TabSettings" Text="НАСТРОЙКИ" Sound="" FontSize="16" Height="38" Tilt="1.5" Hint="Клавиши, индикатор, автозапуск, обновления" />
+            </WrapPanel>
 
-                <!-- MIC CARD -->
-                <Border x:Name="MicCard" Grid.Column="0" Style="{StaticResource Card}">
-                    <Border.RenderTransform>
-                        <RotateTransform Angle="-1" />
-                    </Border.RenderTransform>
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource Header}" Text="МИКРОФОН" />
+            <!-- Pages: inactive ones are Hidden (not Collapsed) so the window keeps the height of the tallest -->
+            <Grid x:Name="Pages" Grid.Row="3">
+                <Grid x:Name="PageVoice"><Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.35*" />
+                        <ColumnDefinition Width="26" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid Grid.Column="0"><Border x:Name="MicCard" Style="{StaticResource Card}">
+                        <Border.RenderTransform>
+                            <RotateTransform Angle="-1" />
+                        </Border.RenderTransform>
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource Header}" Text="МИКРОФОН" />
 
                         <WrapPanel x:Name="StripPanel" Margin="0,4,0,0" />
 
@@ -131,69 +138,78 @@
                                            Bipolar="True" Hint="Влево — теплее, вправо — ярче и разборчивее" />
                         </Grid>
 
-                        <TextBlock Style="{StaticResource SubHeader}" Text="ГРОМКОСТЬ" Margin="0,12,0,6" />
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="24" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <c:SlashSlider x:Name="GameGainS" Grid.Column="0" Label="ИГРА / КОМПЬЮТЕР"
-                                           Minimum="-60" Maximum="12" Default="0" Step="0.5" Unit=" dB"
-                                           Hint="Громкость всего, что играет через Voicemeeter Input (игра, браузер, музыка). Выше 0 — усиление, до +12 dB. Двойной клик — 0 dB" />
-                            <c:SlashSlider x:Name="PhonesGainS" Grid.Column="2" Label="НАУШНИКИ (ВСЁ)"
-                                           Minimum="-60" Maximum="12" Default="0" Step="0.5" Unit=" dB"
-                                           Hint="Общая громкость выхода A1: игра, друзья и всё остальное разом. Выше 0 — усиление, до +12 dB. Двойной клик — 0 dB" />
-                        </Grid>
-
-                        <StackPanel x:Name="DiscordPanel">
-                            <DockPanel Margin="0,12,0,6">
-                                <TextBlock x:Name="DiscordState" DockPanel.Dock="Right" Text="ТИШИНА" Foreground="#808080"
-                                           FontFamily="Arial Black" FontSize="12" VerticalAlignment="Bottom" Margin="0,0,4,3" />
-                                <TextBlock Style="{StaticResource SubHeader}" Text="DISCORD // AUX" Margin="0"
-                                           ToolTip="В Discord поставь устройство вывода «Voicemeeter AUX Input» — тогда голоса друзей идут отдельно от игры" />
-                            </DockPanel>
-                            <c:SlashSlider x:Name="AuxGainS" Label="ГРОМКОСТЬ ДРУЗЕЙ"
-                                           Minimum="-60" Maximum="12" Default="0" Step="0.5" Unit=" dB"
-                                           Hint="Громкость Discord отдельно от игры. Работает, если в Discord устройство вывода — «Voicemeeter AUX Input»" />
-                            <WrapPanel Margin="0,10,0,0">
-                                <c:SlashToggle x:Name="FriendsBtn" Text="ДРУЗЬЯ" IsToggle="False" Sound="" FontSize="12" Height="32"
-                                               Hint="Громкость каждого человека в голосовом канале отдельно" />
-                                <c:SlashToggle x:Name="FriendsClipsT" Text="В КЛИПЫ" FontSize="12" Height="32" Tilt="1"
-                                               Hint="Записывать голоса друзей в клипы ShadowPlay. Выключено — в клипах только игра и ты. Работает через шину B2: в ShadowPlay микрофон = Voicemeeter Out B2, «Системные звуки» = 0%" />
-                                <c:SlashToggle x:Name="DuckFriendsT" Text="ИГРА ТИШЕ ПОД ДРУЗЕЙ" FontSize="12" Height="32" Tilt="-1"
-                                               Hint="Когда говорят друзья в Discord, игра стихает (на столько же, сколько в «НА СКОЛЬКО»)" />
-                            </WrapPanel>
+                        
                         </StackPanel>
-                    </StackPanel>
-                </Border>
+                    </Border></Grid>
+                    <Grid Grid.Column="2"><Border x:Name="OutCard" Style="{StaticResource Card}">
+                        <Border.RenderTransform>
+                            <RotateTransform Angle="1" />
+                        </Border.RenderTransform>
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource Header}" Text="ПРЕСЕТЫ" />
+                            <WrapPanel x:Name="PresetPanel" />
+                        <TextBlock Text="ПКМ по своему пресету — перезаписать / удалить / привязать к программе" Foreground="#808080" FontSize="11" Margin="2,0,0,0" />
 
-                <!-- OUTPUT CARD -->
-                <Border x:Name="OutCard" Grid.Column="2" Style="{StaticResource Card}">
-                    <Border.RenderTransform>
-                        <RotateTransform Angle="1" />
-                    </Border.RenderTransform>
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource Header}" Text="ЗАПИСЬ // B1" />
-                        <TextBlock Text="То, что слышат ShadowPlay и Discord" Foreground="#808080" FontSize="12" Margin="2,0,0,8" />
-
-                        <c:JaggedMeter x:Name="OutMeter" Margin="0,0,0,10" />
+                        
+                            <c:SlashToggle x:Name="MicPresetT" Text="ПРЕСЕТ ПО МИКРОФОНУ" FontSize="12" Height="32" Tilt="-1" HorizontalAlignment="Left"
+                                           Margin="0,10,8,8"
+                                           Hint="Сменил или подключил микрофон — включается пресет, сохранённый с этим микрофоном. Если таких несколько — последний, которым ты пользовался" />
+                            <TextBlock Style="{StaticResource SubHeader}" Text="ЗАПИСЬ // B1" Margin="0,12,0,2" />
+                            <TextBlock Text="То, что слышат ShadowPlay и Discord" Foreground="#9A9A9A" FontSize="12" TextWrapping="Wrap" Margin="2,0,0,10" />
+                            <c:JaggedMeter x:Name="OutMeter" Margin="0,0,0,10" />
                         <c:SlashSlider x:Name="OutGainS" Label="ГРОМКОСТЬ B1" Minimum="-60" Maximum="12" Default="0"
                                        Step="0.5" Unit=" dB" Hint="Общая громкость того, что уходит в запись" />
                         <WrapPanel Margin="0,10,0,0">
                             <c:SlashToggle x:Name="OutMuteT" Text="MUTE B1" Hint="Заглушить весь выход в запись" />
                         </WrapPanel>
 
-                        <TextBlock Style="{StaticResource SubHeader}" Text="ПРЕСЕТЫ" />
-                        <WrapPanel x:Name="PresetPanel" />
-                        <TextBlock Text="ПКМ по своему пресету — перезаписать / удалить / привязать к программе" Foreground="#808080" FontSize="11" Margin="2,0,0,0" />
+                        
+                        </StackPanel>
+                    </Border></Grid>
+                </Grid></Grid>
+                <Grid x:Name="PageSound" Visibility="Hidden"><Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1*" />
+                        <ColumnDefinition Width="26" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid Grid.Column="0"><Border Style="{StaticResource Card}">
+                        <Border.RenderTransform>
+                            <RotateTransform Angle="-0.8" />
+                        </Border.RenderTransform>
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource Header}" Text="ГРОМКОСТЬ" />
+                            <TextBlock Text="Сколько чего ты слышишь. Выше 0 dB — усиление" Foreground="#9A9A9A" FontSize="12" TextWrapping="Wrap" Margin="2,0,0,10" />
+                            <Grid>
+<Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="0" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <c:SlashSlider x:Name="GameGainS" Grid.Column="0" Grid.ColumnSpan="3" Label="ИГРА / КОМПЬЮТЕР"
+                                           Minimum="-60" Maximum="12" Default="0" Step="0.5" Unit=" dB"
+                                           Hint="Громкость всего, что играет через Voicemeeter Input (игра, браузер, музыка). Выше 0 — усиление, до +12 dB. Двойной клик — 0 dB" />
+                            <c:SlashSlider x:Name="PhonesGainS" Grid.Column="0" Grid.ColumnSpan="3" Grid.Row="1" Margin="0,14,0,0" Label="НАУШНИКИ (ВСЁ)"
+                                           Minimum="-60" Maximum="12" Default="0" Step="0.5" Unit=" dB"
+                                           Hint="Общая громкость выхода A1: игра, друзья и всё остальное разом. Выше 0 — усиление, до +12 dB. Двойной клик — 0 dB" />
+                        </Grid>
 
-                        <DockPanel Margin="0,10,0,6">
-                            <TextBlock x:Name="DuckState" DockPanel.Dock="Right" Text="ВЫКЛЮЧЕНО" Foreground="#808080"
+                        
+                        </StackPanel>
+                    </Border></Grid>
+                    <Grid Grid.Column="2"><Border Style="{StaticResource Card}">
+                        <Border.RenderTransform>
+                            <RotateTransform Angle="1" />
+                        </Border.RenderTransform>
+                        <StackPanel>
+                            <DockPanel>
+                                <TextBlock x:Name="DuckState" DockPanel.Dock="Right" Text="ВЫКЛЮЧЕНО" Foreground="#808080"
                                        FontFamily="Arial Black" FontSize="12" VerticalAlignment="Bottom" Margin="0,0,4,3" />
-                            <TextBlock Style="{StaticResource SubHeader}" Text="АВТОПРИГЛУШЕНИЕ" Margin="0" />
-                        </DockPanel>
-                        <WrapPanel>
+                                <TextBlock Style="{StaticResource Header}" Text="АВТОПРИГЛУШЕНИЕ" FontSize="28" />
+                            </DockPanel>
+                            <TextBlock Text="Игра стихает, пока ты говоришь" Foreground="#9A9A9A" FontSize="12" TextWrapping="Wrap" Margin="2,0,0,10" />
+                            <WrapPanel>
                             <c:SlashToggle x:Name="DuckT" Text="ВКЛ" FontSize="13" Height="32" Tilt="-1"
                                            Hint="Когда говоришь, игра/музыка в Voicemeeter стихает. Звук игры должен идти в Voicemeeter Input" />
                             <c:SlashToggle x:Name="DuckMainT" Text="VM INPUT" FontSize="13" Height="32"
@@ -218,35 +234,119 @@
                                            Default="-40" Step="1" Unit=" dB" Decimals="0"
                                            Hint="Громкость микрофона, с которой считается, что ты говоришь. Срабатывает от шума — подними; не срабатывает — опусти" />
                         </Grid>
-                    </StackPanel>
-                </Border>
-            </Grid>
 
-            <DockPanel Grid.Row="3" Margin="4,12,0,0">
-                <c:SlashToggle x:Name="CheckUpdBtn" DockPanel.Dock="Right" Text="ОБНОВЛЕНИЯ" IsToggle="False"
-                               FontSize="12" Height="32" Tilt="-1" VerticalAlignment="Top"
-                               Hint="Проверить, вышла ли новая версия, и сразу скачать её" />
-                <TextBlock x:Name="VersionText" DockPanel.Dock="Right" Foreground="#9A9A9A" FontSize="12"
-                           VerticalAlignment="Center" Margin="0,0,6,8" />
-                <WrapPanel>
-                    <c:SlashToggle x:Name="HotkeyBtn" IsToggle="False" Text="MUTE НА КЛАВИШЕ: PAUSE" FontSize="12" Height="32"
+                        </StackPanel>
+                    </Border></Grid>
+                </Grid></Grid>
+                <Grid x:Name="PageDiscord" Visibility="Hidden"><Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.35*" />
+                        <ColumnDefinition Width="26" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid Grid.Column="0"><Border Style="{StaticResource Card}">
+                        <Border.RenderTransform>
+                            <RotateTransform Angle="-0.8" />
+                        </Border.RenderTransform>
+                        <StackPanel>
+                            <StackPanel x:Name="DiscordPanel">
+                            <DockPanel Margin="0,0,0,10">
+                                <TextBlock x:Name="DiscordState" DockPanel.Dock="Right" Text="ТИШИНА" Foreground="#808080"
+                                           FontFamily="Arial Black" FontSize="12" VerticalAlignment="Bottom" Margin="0,0,4,3" />
+                                <TextBlock Style="{StaticResource Header}" Text="DISCORD" Margin="0"
+                                           ToolTip="В Discord поставь устройство вывода «Voicemeeter AUX Input» — тогда голоса друзей идут отдельно от игры" />
+                            </DockPanel>
+                            <c:SlashSlider x:Name="AuxGainS" Label="ГРОМКОСТЬ ДРУЗЕЙ"
+                                           Minimum="-60" Maximum="12" Default="0" Step="0.5" Unit=" dB"
+                                           Hint="Громкость Discord отдельно от игры. Работает, если в Discord устройство вывода — «Voicemeeter AUX Input»" />
+                            <WrapPanel Margin="0,10,0,0">
+                                <c:SlashToggle x:Name="FriendsBtn" Text="ДРУЗЬЯ" IsToggle="False" Sound="" FontSize="12" Height="32"
+                                               Hint="Громкость каждого человека в голосовом канале отдельно" />
+                                <c:SlashToggle x:Name="FriendsClipsT" Text="В КЛИПЫ" FontSize="12" Height="32" Tilt="1"
+                                               Hint="Записывать голоса друзей в клипы ShadowPlay. Выключено — в клипах только игра и ты. Работает через шину B2: в ShadowPlay микрофон = Voicemeeter Out B2, «Системные звуки» = 0%" />
+                                <c:SlashToggle x:Name="DuckFriendsT" Text="ИГРА ТИШЕ ПОД ДРУЗЕЙ" FontSize="12" Height="32" Tilt="-1"
+                                               Hint="Когда говорят друзья в Discord, игра стихает (на столько же, сколько в «НА СКОЛЬКО»)" />
+                            </WrapPanel>
+                        </StackPanel>
+
+                        </StackPanel>
+                    </Border></Grid>
+                    <Grid Grid.Column="2"><Border Style="{StaticResource Card}">
+                        <Border.RenderTransform>
+                            <RotateTransform Angle="1" />
+                        </Border.RenderTransform>
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource Header}" Text="КАК НАСТРОИТЬ" FontSize="26" />
+                            <TextBlock Foreground="#C8C8C8" FontSize="13" TextWrapping="Wrap" Margin="2,4,0,0">
+                                1. Discord → Настройки → Голос и видео → Устройство вывода: <Run Foreground="#F5F5F5" FontWeight="Bold">Voicemeeter AUX Input</Run>.<LineBreak /><LineBreak />
+                                2. Там же устройство ввода: <Run Foreground="#F5F5F5" FontWeight="Bold">Voicemeeter Out B1</Run>, эхоподавление выключено.<LineBreak /><LineBreak />
+                                3. «ДРУЗЬЯ» — подключить панель к Discord: громкость каждого, список поверх игры, вход и выход.<LineBreak /><LineBreak />
+                                В игре над списком: Ctrl + колёсико — громкость человека, Ctrl + тащить — вытащить его отдельно, Shift + тащить / колёсико — двигать и менять размер, Ctrl + Shift + клик — открыть в Discord.
+                            </TextBlock>
+                        </StackPanel>
+                    </Border></Grid>
+                </Grid></Grid>
+                <Grid x:Name="PageSettings" Visibility="Hidden"><Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.35*" />
+                        <ColumnDefinition Width="26" />
+                        <ColumnDefinition Width="1*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid Grid.Column="0"><Border Style="{StaticResource Card}">
+                        <Border.RenderTransform>
+                            <RotateTransform Angle="-0.6" />
+                        </Border.RenderTransform>
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource Header}" Text="НАСТРОЙКИ" />
+                            <TextBlock Style="{StaticResource SubHeader}" Text="КЛАВИШИ" Margin="0,4,0,6" />
+                            <WrapPanel>
+                                <c:SlashToggle x:Name="HotkeyBtn" IsToggle="False" Text="MUTE НА КЛАВИШЕ: PAUSE" FontSize="12" Height="32"
                                    Hint="Глобальная горячая клавиша вкл/выкл микрофона. Нажми и введи комбинацию. Backspace — убрать, Esc — отмена" />
-                    <c:SlashToggle x:Name="ToastT" Text="ПЛАШКА MIC OFF" FontSize="12" Height="32" Tilt="1"
-                                   Hint="Показывать «MIC OFF / MIC ON» поверх экрана при переключении" />
-                    <c:SlashToggle x:Name="OverlayBtn" IsToggle="False" Text="ИНДИКАТОР: ВЫКЛ" FontSize="12" Height="32" Tilt="-1"
-                                   Hint="Полоска уровня микрофона поверх игры: полупрозрачная, пока молчишь, яркая, когда говоришь или при MIC OFF. Shift + тащить — подвинуть, Shift + колёсико — размер, Ctrl + колёсико — громкость микрофона. Нажатие на кнопку — следующий угол" />
-                    <c:SlashToggle x:Name="VolKeysT" Text="КЛАВИШИ ГРОМКОСТИ" FontSize="12" Height="32" Tilt="1"
+                                <c:SlashToggle x:Name="VolKeysT" Text="КЛАВИШИ ГРОМКОСТИ" FontSize="12" Height="32" Tilt="1"
                                    Hint="Клавиши громкости на клавиатуре (тише / громче / без звука) управляют громкостью наушников в Voicemeeter. Работает, пока звук Windows идёт через Voicemeeter" />
-                    <c:SlashToggle x:Name="ShowVmBtn" Text="VOICEMEETER" IsToggle="False" FontSize="12" Height="32"
-                                   Hint="Открыть окно Voicemeeter" />
-                    <c:SlashToggle x:Name="RestartBtn" Text="РЕСТАРТ ЗВУКА" IsToggle="False" FontSize="12" Height="32" Tilt="-1"
-                                   Hint="Restart Audio Engine — если звук заикается или пропал" />
-                    <c:SlashToggle x:Name="SfxT" Text="ЗВУКИ" FontSize="12" Height="32" Tilt="1.5"
+                            </WrapPanel>
+                            <TextBlock Style="{StaticResource SubHeader}" Text="ПОВЕРХ ИГРЫ" Margin="0,14,0,6" />
+                            <WrapPanel>
+                                <c:SlashToggle x:Name="OverlayBtn" IsToggle="False" Text="ИНДИКАТОР: ВЫКЛ" FontSize="12" Height="32" Tilt="-1"
+                                   Hint="Полоска уровня микрофона поверх игры: полупрозрачная, пока молчишь, яркая, когда говоришь или при MIC OFF. Shift + тащить — подвинуть, Shift + колёсико — размер, Ctrl + колёсико — громкость микрофона. Нажатие на кнопку — следующий угол" />
+                                <c:SlashToggle x:Name="ToastT" Text="ПЛАШКА MIC OFF" FontSize="12" Height="32" Tilt="1"
+                                   Hint="Показывать «MIC OFF / MIC ON» поверх экрана при переключении" />
+                            </WrapPanel>
+                            <TextBlock Text="Индикатор: Shift + тащить — подвинуть, Shift + колёсико — размер, Ctrl + колёсико — громкость микрофона" Foreground="#9A9A9A" FontSize="12" TextWrapping="Wrap" Margin="2,0,0,10" />
+                            <TextBlock Style="{StaticResource SubHeader}" Text="ПРОГРАММА" Margin="0,14,0,6" />
+                            <WrapPanel>
+                                <c:SlashToggle x:Name="SfxT" Text="ЗВУКИ" FontSize="12" Height="32" Tilt="1.5"
                                    Hint="Звуки интерфейса. Свои .wav (hover, click, confirm, cancel, whoosh) можно положить в папку звуков — см. меню иконки в трее" />
-                    <c:SlashToggle x:Name="AutostartT" Text="АВТОЗАПУСК" FontSize="12" Height="32" Tilt="-1"
+                                <c:SlashToggle x:Name="AutostartT" Text="АВТОЗАПУСК" FontSize="12" Height="32" Tilt="-1"
                                    Hint="Запускаться вместе с Windows (сразу в трей)" />
-                </WrapPanel>
-            </DockPanel>
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border></Grid>
+                    <Grid Grid.Column="2"><Border Style="{StaticResource Card}">
+                        <Border.RenderTransform>
+                            <RotateTransform Angle="1" />
+                        </Border.RenderTransform>
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource Header}" Text="СЕРВИС" FontSize="28" />
+                            <TextBlock Style="{StaticResource SubHeader}" Text="VOICEMEETER" Margin="0,4,0,6" />
+                            <WrapPanel>
+                                <c:SlashToggle x:Name="ShowVmBtn" Text="VOICEMEETER" IsToggle="False" FontSize="12" Height="32"
+                                   Hint="Открыть окно Voicemeeter" />
+                                <c:SlashToggle x:Name="RestartBtn" Text="РЕСТАРТ ЗВУКА" IsToggle="False" FontSize="12" Height="32" Tilt="-1"
+                                   Hint="Restart Audio Engine — если звук заикается или пропал" />
+                            </WrapPanel>
+                            <TextBlock Style="{StaticResource SubHeader}" Text="ОБНОВЛЕНИЯ" Margin="0,14,0,6" />
+                            <WrapPanel>
+                                <c:SlashToggle x:Name="CheckUpdBtn" Text="ОБНОВЛЕНИЯ" IsToggle="False"
+                               FontSize="12" Height="32" Tilt="-1"
+                               Hint="Проверить, вышла ли новая версия, и сразу скачать её" />
+                                <TextBlock x:Name="VersionText" Foreground="#9A9A9A" FontSize="12"
+                           VerticalAlignment="Center" Margin="6,0,0,8" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border></Grid>
+                </Grid></Grid>
+            </Grid>
         </Grid>
 
         <!-- Calibration / diagnostics overlay -->

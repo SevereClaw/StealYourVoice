@@ -82,6 +82,7 @@ public partial class MainWindow : Window
 
         InitTools();
         InitDucking();
+        InitTabs();
         InitFx();
         InitExtras();
         InitDiscord();
@@ -164,6 +165,7 @@ public partial class MainWindow : Window
         if (Math.Abs(_timer.Interval.TotalMilliseconds - wantMs) > 1) _timer.Interval = TimeSpan.FromMilliseconds(wantMs);
 
         DiscordTick();
+        if (_tick % 60 == 30) CheckMicPlugged();
         if (_tick % 150 == 0) SyncVolumeKeys();
 
         if (!_vm.IsConnected)
@@ -242,6 +244,7 @@ public partial class MainWindow : Window
         HeadBtn.Text = "НАУШНИКИ (A1): " + (string.IsNullOrWhiteSpace(head) ? "НЕ ВЫБРАНЫ ⚠" : head.ToUpperInvariant());
 
         RefreshExtras();
+        CheckMicChanged();
         UpdateTrayMute();
     }
 
@@ -475,11 +478,18 @@ public partial class MainWindow : Window
             StatusText.Text = $"МИКРОФОН ИЗ ПРЕСЕТА НЕ ПОДКЛЮЧЁН: {p.DeviceName.ToUpperInvariant()}";
             return;
         }
+        _presetDevice = dev.Name;
+        _seenDevice = null; // the next refresh just records the new mic
         _vm.SetStripDevice(_strip, dev);
     }
 
     private void ApplyUserPreset(UserPreset p, string? reason = null)
     {
+        if (!string.IsNullOrEmpty(p.Name))
+        {
+            p.LastUsed = DateTime.Now;
+            _settings.Save();
+        }
         // unnamed = the snapshot we restore when the bound programs close; that one announces itself separately
         if (!string.IsNullOrEmpty(p.Name)) ShowPresetBanner(reason ?? "ПРЕСЕТ ВКЛЮЧЁН", p.Name.ToUpperInvariant());
         ApplyPresetDevice(p);
