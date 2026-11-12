@@ -41,6 +41,17 @@ public partial class MainWindow
             e.Handled = true;
         };
 
+        FollowVoiceT.IsChecked = _settings.FollowVoice;
+        FollowVoiceT.Click += t =>
+        {
+            _settings.FollowVoice = t.IsChecked;
+            _settings.Save();
+            if (!t.IsChecked) { _micWatcher?.Dispose(); _micWatcher = null; }
+            StatusText.Text = t.IsChecked
+                ? "СЛУШАЮ МИКРОФОНЫ С ПРЕСЕТАМИ // ЗАГОВОРИШЬ В ДРУГОЙ — ПЕРЕКЛЮЧУСЬ"
+                : "ПЕРЕКЛЮЧЕНИЕ ПО ГОЛОСУ ВЫКЛЮЧЕНО";
+        };
+
         MicPresetT.IsChecked = _settings.MicPresetAuto;
         MicPresetT.Click += t => { _settings.MicPresetAuto = t.IsChecked; _settings.Save(); };
     }
@@ -66,6 +77,66 @@ public partial class MainWindow
         move.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(60, 0, TimeSpan.FromMilliseconds(260))
             { EasingFunction = new BackEase { Amplitude = 0.35, EasingMode = EasingMode.EaseOut } });
         page.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180)));
+    }
+
+    // ───────────────────────── switch to the mic you are talking into ─────────────────────────
+
+    private Audio.MicWatcher? _micWatcher;
+    private DateTime _lastVoiceSwitch = DateTime.MinValue;
+
+    private static bool SameMic(string windowsName, string vmName) =>
+        string.Equals(windowsName, vmName, StringComparison.OrdinalIgnoreCase) ||
+        windowsName.StartsWith(vmName, StringComparison.OrdinalIgnoreCase); // MME names are cut to 31 characters
+
+    /// <summary>~10 times a second.</summary>
+    private void FollowVoiceTick()
+    {
+        if (!_settings.FollowVoice || !_vm.IsConnected) return;
+        _micWatcher ??= new Audio.MicWatcher();
+
+        var current = _vm.GetString(S("device.name"));
+
+        // every ~3 s: listen to every plugged-in mic that has a preset, except the one Voicemeeter already uses
+        if (_tick % 90 == 0)
+        {
+            var wanted = new List<string>();
+            foreach (var n in _knownMics ?? new HashSet<string>())
+            {
+                if (!string.IsNullOrWhiteSpace(current) && SameMic(n, current)) continue;
+                if (_settings.Presets.Any(p => !string.IsNullOrWhiteSpace(p.DeviceName) && SameMic(n, p.DeviceName))) wanted.Add(n);
+            }
+            _micWatcher.Sync(wanted);
+        }
+
+        if ((DateTime.Now - _lastVoiceSwitch).TotalSeconds < 3) return; // let the new mic settle
+
+        var (cl, cr) = _vm.StripChannels(_strip, 0); // what the active mic hears right now
+        double currentDb = Controls.P5.ToDb(Math.Max(cl, cr));
+        var now = DateTime.Now;
+
+        foreach (var (name, peak) in _micWatcher.Read())
+        {
+            double db = Controls.P5.ToDb(peak);
+            // clearly talking into THIS mic: loud enough, and much louder than the active one (not just room bleed)
+            bool loud = db > -38 && db - currentDb > 10;
+            if (!loud) { _micWatcher.SetLoudSince(name, DateTime.MinValue); continue; }
+
+            var since = _micWatcher.LoudSince(name);
+            if (since == DateTime.MinValue) { _micWatcher.SetLoudSince(name, now); continue; }
+            if ((now - since).TotalMilliseconds < 350) continue; // a word, not a bump on the desk
+
+            var p = _settings.Presets
+                .Where(x => !string.IsNullOrWhiteSpace(x.DeviceName) && SameMic(name, x.DeviceName))
+                .OrderByDescending(x => x.LastUsed)
+                .FirstOrDefault();
+            if (p == null) continue;
+
+            _lastVoiceSwitch = now;
+            _micWatcher.SetLoudSince(name, DateTime.MinValue);
+            ApplyUserPreset(p, "ГОВОРИШЬ В ДРУГОЙ МИКРОФОН");
+            _micWatcher.Sync(Array.Empty<string>()); // re-pick the listened set right away next round
+            return;
+        }
     }
 
     // ───────────────────────── presets that follow the microphone ─────────────────────────

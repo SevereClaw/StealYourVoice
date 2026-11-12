@@ -47,6 +47,9 @@ public sealed class Settings
     /// <summary>Switching to / plugging in a mic turns on the preset that was saved with it.</summary>
     public bool MicPresetAuto { get; set; } = true;
 
+    /// <summary>Start talking into another mic that has a preset → switch the input (and the preset) to it.</summary>
+    public bool FollowVoice { get; set; }
+
     /// <summary>
     /// A virtual bus (B2 on Banana, B3 on Potato) carries only Discord, so CyberCall can subtitle friends
     /// while recorders never see that bus.

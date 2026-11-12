@@ -151,9 +151,13 @@
                         <TextBlock Text="ПКМ по своему пресету — перезаписать / удалить / привязать к программе" Foreground="#808080" FontSize="11" Margin="2,0,0,0" />
 
                         
+                            <WrapPanel Margin="0,10,0,0">
+                            <c:SlashToggle x:Name="FollowVoiceT" Text="ГОВОРЮ — ПЕРЕКЛЮЧАЮСЬ" FontSize="12" Height="32" Tilt="1"
+                                           Hint="Начал говорить в другой микрофон, у которого есть свой пресет, — панель сама переключит вход на него и включит его пресет. Даже если сейчас работает другой микрофон" />
                             <c:SlashToggle x:Name="MicPresetT" Text="ПРЕСЕТ ПО МИКРОФОНУ" FontSize="12" Height="32" Tilt="-1" HorizontalAlignment="Left"
-                                           Margin="0,10,8,8"
+                                           Margin="0,0,8,8"
                                            Hint="Сменил или подключил микрофон — включается пресет, сохранённый с этим микрофоном. Если таких несколько — последний, которым ты пользовался" />
+                            </WrapPanel>
                             <TextBlock Style="{StaticResource SubHeader}" Text="ЗАПИСЬ // B1" Margin="0,12,0,2" />
                             <TextBlock Text="То, что слышат ShadowPlay и Discord" Foreground="#9A9A9A" FontSize="12" TextWrapping="Wrap" Margin="2,0,0,10" />
                             <c:JaggedMeter x:Name="OutMeter" Margin="0,0,0,10" />

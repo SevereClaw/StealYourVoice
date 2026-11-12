@@ -166,6 +166,7 @@ public partial class MainWindow : Window
 
         DiscordTick();
         if (_tick % 60 == 30) CheckMicPlugged();
+        if (_tick % 3 == 0) FollowVoiceTick();
         if (_tick % 150 == 0) SyncVolumeKeys();
 
         if (!_vm.IsConnected)
@@ -980,6 +981,7 @@ public partial class MainWindow : Window
         if (_hwnd != IntPtr.Zero) UnregisterHotKey(_hwnd, HotkeyId);
         _settings.Flush();
         _toast?.Close();
+        _micWatcher?.Dispose();
         ReleaseVolumeKeys();
         _volToast?.Close();
         _overlay?.Close();
