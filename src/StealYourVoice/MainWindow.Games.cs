@@ -310,6 +310,13 @@ public partial class MainWindow
         }
 
         StreamGateTick();
+        // Alt pressed or released without moving the mouse: show / hide the mute buttons
+        if (_tick % 3 == 0 && _settings.SpeakersCorner != 0)
+        {
+            bool alt = MouseHook.AltDown;
+            _speakers?.SetAlt(alt);
+            foreach (var d in _detached.Values) d.SetAlt(alt);
+        }
         if (_tick % 15 == 0) FocusTick();
         if (_tick % 90 == 0) GameTick();
     }

@@ -35,6 +35,9 @@ public sealed class SpeakersOverlay : Window
         public ScaleTransform VolPop = null!;
         public TextBlock VolText = null!;
         public TextBlock Tag = null!;
+        public Border MuteBtn = null!;
+        public StatusIcon MuteIcon = null!;
+        public ScaleTransform MutePop = null!;
         public int LastVol = -1;
     }
 
@@ -56,6 +59,9 @@ public sealed class SpeakersOverlay : Window
     private string _signature = "";
     private string? _volShownFor;
     private string? _hover;
+    private bool _alt;
+    private string? _selfId;
+    private IReadOnlyDictionary<string, bool> _localMutes = new Dictionary<string, bool>();
     private int _corner = 1;
     private double _offset;
     private Point? _custom;
@@ -242,6 +248,75 @@ public sealed class SpeakersOverlay : Window
         _hover = id;
         foreach (var kv in _rows) ApplyHover(kv.Value, kv.Key == id, true);
         SetSpeaking(_speaking);
+        ApplyMuteButtons();
+    }
+
+    /// <summary>Alt held: the hovered plate shows a mic button for muting that person locally.</summary>
+    public void SetAlt(bool alt)
+    {
+        if (alt == _alt) return;
+        _alt = alt;
+        ApplyMuteButtons();
+    }
+
+    public void SetLocalMutes(IReadOnlyDictionary<string, bool> mutes, string? selfId)
+    {
+        _localMutes = mutes;
+        _selfId = selfId;
+        foreach (var kv in _rows)
+            kv.Value.MuteIcon.Crossed = _localMutes.TryGetValue(kv.Key, out var m) && m;
+    }
+
+    private void ApplyMuteButtons()
+    {
+        foreach (var kv in _rows)
+        {
+            var r = kv.Value;
+            bool show = _alt && kv.Key == _hover && kv.Key != _selfId;
+            bool was = r.MuteBtn.Visibility == Visibility.Visible;
+            r.MuteBtn.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            if (show && !was)
+            {
+                var pop = new DoubleAnimation(0.3, 1, TimeSpan.FromMilliseconds(220))
+                    { EasingFunction = new BackEase { Amplitude = 0.8, EasingMode = EasingMode.EaseOut } };
+                r.MutePop.BeginAnimation(ScaleTransform.ScaleXProperty, pop);
+                r.MutePop.BeginAnimation(ScaleTransform.ScaleYProperty, pop);
+            }
+        }
+    }
+
+    /// <summary>Whose mic button is under this physical screen point (only while it is shown)?</summary>
+    public string? MuteButtonAt(int x, int y)
+    {
+        try
+        {
+            var h = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (h == IntPtr.Zero || !GetWindowRect(h, out var r)) return null;
+            double k = DpiScale;
+            var p = new Point((x - r.Left) / k, (y - r.Top) / k);
+            foreach (var kv in _rows)
+            {
+                var b = kv.Value.MuteBtn;
+                if (!b.IsVisible) continue;
+                var box = b.TransformToAncestor(this).TransformBounds(new Rect(b.RenderSize));
+                box.Inflate(6, 6);
+                if (box.Contains(p)) return kv.Key;
+            }
+        }
+        catch { /* layout not ready */ }
+        return null;
+    }
+
+    /// <summary>Feedback after a click: the button kicks and the icon flips.</summary>
+    public void FlashMute(string id, bool muted)
+    {
+        if (!_rows.TryGetValue(id, out var r)) return;
+        r.MuteIcon.Crossed = muted;
+        r.MuteBtn.Background = muted ? P5.Red : P5.Black;
+        var kick = new DoubleAnimation(1.4, 1, TimeSpan.FromMilliseconds(240))
+            { EasingFunction = new BackEase { Amplitude = 0.6, EasingMode = EasingMode.EaseOut } };
+        r.MutePop.BeginAnimation(ScaleTransform.ScaleXProperty, kick);
+        r.MutePop.BeginAnimation(ScaleTransform.ScaleYProperty, kick);
     }
 
     private static void ApplyHover(Row row, bool on, bool animate)
@@ -399,6 +474,24 @@ public sealed class SpeakersOverlay : Window
         var line = new StackPanel { Orientation = Orientation.Horizontal };
         line.Children.Add(avatar);
 
+        // Alt + hover: mute this person only for you
+        row.MuteIcon = new StatusIcon(false) { Crossed = m.MicOff };
+        row.MutePop = new ScaleTransform(1, 1);
+        row.MuteBtn = new Border
+        {
+            Child = row.MuteIcon,
+            Background = P5.Black,
+            BorderBrush = P5.Red,
+            BorderThickness = new Thickness(2),
+            Padding = new Thickness(5, 4, 5, 4),
+            Margin = new Thickness(8, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Visibility = Visibility.Collapsed,
+            RenderTransformOrigin = new Point(0.5, 0.5),
+            RenderTransform = row.MutePop
+        };
+        line.Children.Add(row.MuteBtn);
+
         if (!style.AvatarsOnly)
         {
             row.Name = Label(shortName.ToUpperInvariant(), 14, P5.White, new Thickness(10, 0, 12, 1));
@@ -495,6 +588,9 @@ public sealed class SpeakersOverlay : Window
     private sealed class StatusIcon : FrameworkElement
     {
         private readonly bool _headphones;
+        private bool _crossed = true;
+
+        public bool Crossed { get => _crossed; set { _crossed = value; InvalidateVisual(); } }
 
         public StatusIcon(bool headphones)
         {
@@ -533,6 +629,7 @@ public sealed class SpeakersOverlay : Window
                 dc.DrawGeometry(null, white, cradle);
                 dc.DrawLine(white, new Point(8, 11.5), new Point(8, 15));
             }
+            if (!_crossed) return;
             dc.DrawLine(P5.Pen(P5.Black, 4.2), new Point(2, 14.5), new Point(14, 1.5));
             dc.DrawLine(P5.Pen(P5.Red, 2.2), new Point(2, 14.5), new Point(14, 1.5));
         }

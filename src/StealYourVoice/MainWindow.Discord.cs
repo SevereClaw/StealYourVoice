@@ -56,6 +56,7 @@ public partial class MainWindow
     private bool _dragMic;
     private long _hoverCheck;
     private bool _swallowUp;
+    private readonly Dictionary<string, bool> _dcLocalMute = new();
     private double _micGainLocal;
     private DateTime _micGainLast = DateTime.MinValue;
     private int _spkDragX, _spkDragY;
@@ -417,6 +418,8 @@ public partial class MainWindow
                     int vol = vs.TryGetProperty("volume", out var v) && v.ValueKind == JsonValueKind.Number
                         ? (int)Math.Round(v.GetDouble()) : 100;
                     bool mute = vs.TryGetProperty("mute", out var m) && m.ValueKind == JsonValueKind.True;
+                    // don't let a poll that raced with an Alt-click flip the button back
+                    if ((DateTime.Now - _dcLastTouch).TotalSeconds > 2.5) _dcLocalMute[id] = mute;
 
                     // Discord forgets RPC volumes when we disconnect — put the saved one back
                     if (_dcApplied.Add(id) && _settings.FriendVolumes.TryGetValue(id, out var saved) && saved != vol)
@@ -513,8 +516,13 @@ public partial class MainWindow
             long now = Environment.TickCount64;
             if (now - _hoverCheck < 40) return false;
             _hoverCheck = now;
+            bool alt = MouseHook.AltDown;
             foreach (var l in AllLists())
-                if (l.IsVisible) l.SetHover(l.Contains(x, y) ? l.RowAt(x, y) : null);
+            {
+                if (!l.IsVisible) continue;
+                l.SetHover(l.Contains(x, y) ? l.RowAt(x, y) : null);
+                l.SetAlt(alt);
+            }
             return false;
         }
 
@@ -599,6 +607,29 @@ public partial class MainWindow
         if (msg != MouseHook.WM_LBUTTONDOWN && msg != MouseHook.WM_MOUSEWHEEL) return false;
 
         bool ctrl = MouseHook.CtrlDown, shift = MouseHook.ShiftDown;
+
+        // Alt + click on the mic button of a plate → mute / unmute that person only for you
+        if (msg == MouseHook.WM_LBUTTONDOWN && MouseHook.AltDown && !ctrl && !shift)
+        {
+            var hit = ListAt(x, y);
+            var who = hit?.MuteButtonAt(x, y);
+            if (hit != null && who != null && who != _dcUserId && _dcAuthed)
+            {
+                bool now = !(_dcLocalMute.TryGetValue(who, out var was) && was);
+                _dcLocalMute[who] = now;
+                _dcLastTouch = DateTime.Now;
+                DcSetUser(who, null, now);
+                if (_dcRows.TryGetValue(who, out var fr)) fr.Mute.IsChecked = now;
+                var f = _dcFlags.GetValueOrDefault(who);
+                _dcFlags[who] = (now || f.MicOff && !was, f.Deaf, f.Live, f.Cam);
+                hit.FlashMute(who, now);
+                Audio.Sfx.Play(now ? "cancel" : "confirm");
+                _swallowUp = true;
+                Dispatcher.BeginInvoke(new Action(UpdateSpeakers));
+                return true;
+            }
+        }
+
         if (!ctrl && !shift) return false; // without a modifier everything passes straight through to the game
 
         var list = ListAt(x, y);
@@ -886,6 +917,7 @@ public partial class MainWindow
             d.SetMembers(new[] { m }, 1, 0, style, at);
             d.SetSpeaking(_dcSpeaking);
             d.SetLoudness(loud, _dcSpeaking);
+            d.SetLocalMutes(_dcLocalMute, _dcUserId);
         }
         foreach (var gone in _detached.Keys.Where(k => !parked.Contains(k)).ToList())
         {
@@ -902,6 +934,7 @@ public partial class MainWindow
                 ? new Point(_settings.SpeakersX.Value, _settings.SpeakersY.Value) : null);
         _speakers.SetSpeaking(_dcSpeaking);
         _speakers.SetLoudness(loud, _dcSpeaking);
+        _speakers.SetLocalMutes(_dcLocalMute, _dcUserId);
     }
 
     private void DcSetFriends(List<(string Id, string Name, int Volume, bool Mute)> friends)
