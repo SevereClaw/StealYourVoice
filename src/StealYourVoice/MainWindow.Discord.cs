@@ -402,12 +402,9 @@ public partial class MainWindow
                     {
                         micOff = DcFlag(st, "self_mute") || DcFlag(st, "mute") || DcFlag(st, "suppress");
                         deaf = DcFlag(st, "self_deaf") || DcFlag(st, "deaf");
-                        live = DcFlag(st, "self_stream") || DcFlag(st, "stream") || DcFlag(st, "streaming");
-                        cam = DcFlag(st, "self_video") || DcFlag(st, "video");
+
                     }
-                    // some clients put these next to voice_state instead of inside it
-                    live |= DcFlag(vs, "self_stream") || DcFlag(vs, "stream") || DcFlag(vs, "streaming");
-                    cam |= DcFlag(vs, "self_video") || DcFlag(vs, "video");
+                    // Discord's local RPC has no stream / camera fields (checked on a live answer), so these stay false
                     _dcFlags[id] = (micOff, deaf, live, cam);
 
                     if (id == _dcUserId)

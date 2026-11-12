@@ -389,11 +389,9 @@ public sealed class SpeakersOverlay : Window
         }
 
         StackPanel? badges = null;
-        if (m.MicOff || m.Deaf || m.Live || m.Camera)
+        if (m.MicOff || m.Deaf)
         {
             badges = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-            if (m.Live) badges.Children.Add(TextBadge("LIVE", P5.Red, P5.White));
-            if (m.Camera) badges.Children.Add(TextBadge("CAM", P5.White, P5.Black));
             if (m.MicOff) badges.Children.Add(new StatusIcon(false));
             if (m.Deaf) badges.Children.Add(new StatusIcon(true));
         }
