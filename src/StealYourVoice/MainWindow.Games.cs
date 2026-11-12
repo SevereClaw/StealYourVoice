@@ -258,8 +258,8 @@ public partial class MainWindow
 
         // on Banana the subtitles bus is B2, so the B2 clip modes can't be used at the same time
         bool b2Taken = _settings.CaptionsBus && _vm.Type == Voicemeeter.VmType.Banana;
-        FriendsClipsT.Visibility = b2Taken ? Visibility.Collapsed : Visibility.Visible;
-        if (b2Taken) GameToB2T.Visibility = Visibility.Collapsed;
+        FriendsClipsT.Visibility = b2Taken ? System.Windows.Visibility.Collapsed : System.Windows.Visibility.Visible;
+        if (b2Taken) GameToB2T.Visibility = System.Windows.Visibility.Collapsed;
         CaptionsT.IsChecked = _settings.CaptionsBus;
         // while ducking lowers AUX, the gain we'd read is the temporary one
         bool auxDucked = _ducker is { Active: true } && _settings.DuckEnabled && _settings.DuckAux && !_settings.DuckFriends;
