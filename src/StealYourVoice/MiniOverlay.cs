@@ -138,6 +138,7 @@ public sealed class MiniOverlay : Window
         private const int Blades = 14;
         private double _db = -90;
         private bool _muted;
+        private int _lastKey = int.MinValue;
 
         public string? Note;
         public DateTime NoteUntil = DateTime.MinValue;
@@ -149,6 +150,12 @@ public sealed class MiniOverlay : Window
             var db = P5.ToDb(linear);
             _db = db > _db ? db : Math.Max(db, _db - 2);
             _muted = muted;
+
+            // repaint only when the picture would actually differ (a note animates, so it always repaints)
+            bool note = Note != null && DateTime.Now < NoteUntil;
+            int key = note ? -2 : muted ? -1 : (int)Math.Round(Math.Clamp((_db + 60) / 60.0, 0, 1) * Blades);
+            if (!note && key == _lastKey) return;
+            _lastKey = key;
             InvalidateVisual();
         }
 

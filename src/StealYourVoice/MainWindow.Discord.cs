@@ -441,7 +441,7 @@ public partial class MainWindow
     private void SyncMouseHook()
     {
         bool want = _settings.SpeakersCorner != 0 || _settings.OverlayCorner != 0;
-        if (want) _mouseHook ??= new MouseHook { Handler = OnGlobalMouse };
+        if (want) _mouseHook ??= new MouseHook { Handler = OnGlobalMouse, EveryMove = () => _spkDragging };
         else
         {
             _mouseHook?.Dispose();

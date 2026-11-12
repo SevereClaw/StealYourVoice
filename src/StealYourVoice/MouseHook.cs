@@ -45,6 +45,11 @@ internal sealed class MouseHook : IDisposable
     /// <summary>(message, x, y, wheel delta) → true to swallow the event.</summary>
     public Func<int, int, int, int, bool>? Handler;
 
+    /// <summary>True while something is being dragged — then every movement matters; otherwise ~30 per second is plenty.</summary>
+    public Func<bool>? EveryMove;
+
+    private long _lastMove;
+
     public MouseHook()
     {
         _proc = Callback;
@@ -58,11 +63,20 @@ internal sealed class MouseHook : IDisposable
             try
             {
                 int msg = wParam.ToInt32();
-                if (msg is WM_MOUSEMOVE or WM_LBUTTONDOWN or WM_LBUTTONUP or WM_MOUSEWHEEL)
+                bool wanted = msg is WM_LBUTTONDOWN or WM_LBUTTONUP or WM_MOUSEWHEEL;
+                if (msg == WM_MOUSEMOVE)
                 {
-                    var d = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
-                    int delta = msg == WM_MOUSEWHEEL ? (short)(d.MouseData >> 16) : 0;
-                    if (Handler(msg, d.X, d.Y, delta)) return (IntPtr)1;
+                    // gaming mice report up to 1000 moves a second — look at ~30 of them unless dragging
+                    long now = Environment.TickCount64;
+                    wanted = now - _lastMove >= 30 || (EveryMove?.Invoke() ?? false);
+                    if (wanted) _lastMove = now;
+                }
+                if (wanted)
+                {
+                    // read the three fields straight from memory instead of copying the whole struct
+                    int x = Marshal.ReadInt32(lParam, 0), y = Marshal.ReadInt32(lParam, 4);
+                    int delta = msg == WM_MOUSEWHEEL ? (short)((uint)Marshal.ReadInt32(lParam, 8) >> 16) : 0;
+                    if (Handler(msg, x, y, delta)) return (IntPtr)1;
                 }
             }
             catch { /* never break the user's mouse */ }

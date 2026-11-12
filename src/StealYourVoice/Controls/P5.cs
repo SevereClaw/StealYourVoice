@@ -27,10 +27,15 @@ public static class P5
 
     public static Brush Freeze(Brush b) { b.Freeze(); return b; }
 
+    private static readonly System.Collections.Generic.Dictionary<(Brush, double), Pen> PenCache = new();
+
+    /// <summary>Frozen pens are cached: controls ask for the same few on every repaint.</summary>
     public static Pen Pen(Brush b, double t)
     {
+        if (PenCache.TryGetValue((b, t), out var cached)) return cached;
         var p = new Pen(b, t) { LineJoin = PenLineJoin.Miter };
         p.Freeze();
+        if (b.IsFrozen) PenCache[(b, t)] = p;
         return p;
     }
 

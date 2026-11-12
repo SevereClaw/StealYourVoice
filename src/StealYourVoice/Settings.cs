@@ -103,8 +103,30 @@ public sealed class Settings
         }
     }
 
+    private static System.Windows.Threading.DispatcherTimer? _saveTimer;
+    private static Settings? _pending;
+
+    /// <summary>Queue a save: a burst of changes (dragging a slider, rolling the wheel) becomes one write.</summary>
     public void Save()
     {
+        _pending = this;
+        try
+        {
+            if (_saveTimer == null)
+            {
+                _saveTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };
+                _saveTimer.Tick += (_, _) => { _saveTimer!.Stop(); _pending?.Flush(); };
+            }
+            _saveTimer.Stop();
+            _saveTimer.Start();
+        }
+        catch { Flush(); }
+    }
+
+    /// <summary>Write to disk right now (called on exit).</summary>
+    public void Flush()
+    {
+        _pending = null;
         try
         {
             Directory.CreateDirectory(Dir);

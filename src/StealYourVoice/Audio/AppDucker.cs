@@ -59,8 +59,13 @@ public sealed class AppDucker
         }
     }
 
-    private static IEnumerable<(SimpleAudioVolume Volume, string Name)> Sessions()
+    private static List<(SimpleAudioVolume, string)>? _cache;
+    private static DateTime _cachedAt = DateTime.MinValue;
+
+    /// <param name="maxAgeMs">reuse the last scan if it is younger than this (0 = always scan)</param>
+    private static IEnumerable<(SimpleAudioVolume Volume, string Name)> Sessions(int maxAgeMs = 0)
     {
+        if (maxAgeMs > 0 && _cache != null && (DateTime.Now - _cachedAt).TotalMilliseconds < maxAgeMs) return _cache;
         var result = new List<(SimpleAudioVolume, string)>();
         try
         {
@@ -90,6 +95,8 @@ public sealed class AppDucker
             }
         }
         catch { /* audio service unavailable */ }
+        _cache = result;
+        _cachedAt = DateTime.Now;
         return result;
     }
 
@@ -104,7 +111,7 @@ public sealed class AppDucker
     public void Capture()
     {
         _held.Clear();
-        foreach (var (vol, name) in Sessions())
+        foreach (var (vol, name) in Sessions(8000))
         {
             if (IsAlwaysSkipped(name) || Exclude.Contains(name, StringComparer.OrdinalIgnoreCase)) continue;
             try { _held.Add(new Held { Volume = vol, Base = vol.Volume, Name = name }); } catch { /* ignore */ }

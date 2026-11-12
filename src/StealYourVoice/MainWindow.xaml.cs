@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     private int _tick;
     private bool _exiting;
     private bool _balloonShown;
+    private bool _paramsDirty;
     private readonly Updater _updater = new();
     private readonly DispatcherTimer _updateTimer;
     private bool _updating;
@@ -155,6 +156,13 @@ public partial class MainWindow : Window
     private void OnTick(object? sender, EventArgs e)
     {
         _tick++;
+
+        // nothing on screen and nothing reacting to sound → no need to run 30 times a second
+        bool busy = IsVisible || _settings.DuckEnabled || _settings.DuckFriends
+                    || _settings.OverlayCorner != 0 || _settings.SpeakersCorner != 0;
+        double wantMs = busy ? 33 : 100;
+        if (Math.Abs(_timer.Interval.TotalMilliseconds - wantMs) > 1) _timer.Interval = TimeSpan.FromMilliseconds(wantMs);
+
         DiscordTick();
         if (_tick % 150 == 0) SyncVolumeKeys();
 
@@ -168,7 +176,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (_vm.IsDirty()) RefreshParams();
+        // ducking changes a fader on every tick; re-reading all parameters that often is wasted work
+        if (_vm.IsDirty()) _paramsDirty = true;
+        if (_paramsDirty && _tick % (IsVisible ? 3 : 10) == 0)
+        {
+            _paramsDirty = false;
+            RefreshParams();
+        }
         if (!_vm.IsConnected) { ShowOffline(_vm.LastError); return; }
 
         if (IsVisible)
@@ -696,6 +710,7 @@ public partial class MainWindow : Window
         var micDb = P5.ToDb(Math.Max(l, r));
         bool voice = _settings.DuckEnabled && micDb > _settings.DuckThreshold;
         _ducker.Tick(voice || (friendsOn && _friendsTalking), targets, _settings.DuckAmount);
+        if (!IsVisible) return; // the rest only updates the status text
 
         // is anything actually playing through the ducked inputs? (pre-fader, so ducking itself doesn't fool us)
         double gameDb = -90;
@@ -917,6 +932,7 @@ public partial class MainWindow : Window
         _timer.Stop();
         _ducker?.Restore();
         if (_hwnd != IntPtr.Zero) UnregisterHotKey(_hwnd, HotkeyId);
+        _settings.Flush();
         _toast?.Close();
         ReleaseVolumeKeys();
         _volToast?.Close();

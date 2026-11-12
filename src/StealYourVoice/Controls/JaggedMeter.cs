@@ -10,6 +10,7 @@ public class JaggedMeter : FrameworkElement
     private const double MinDb = -60, MaxDb = 6;
     private double _db = -90, _peakDb = -90;
     private DateTime _peakTime;
+    private long _lastKey = -1;
 
     public int Blades { get; set; } = 40;
 
@@ -26,6 +27,13 @@ public class JaggedMeter : FrameworkElement
             _peakDb = _db;
             _peakTime = DateTime.Now;
         }
+
+        // repaint only when the picture would actually differ
+        long key = ((long)Math.Round(Norm(_db) * Blades) << 24)
+                 ^ ((long)Math.Round(Norm(_peakDb) * Blades) << 12)
+                 ^ (long)Math.Round(Math.Max(_db, -91) + 100);
+        if (key == _lastKey) return;
+        _lastKey = key;
         InvalidateVisual();
     }
 
