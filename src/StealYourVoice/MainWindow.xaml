@@ -444,6 +444,8 @@
                         <c:SlashToggle x:Name="DcPortalBtn" Text="ОТКРЫТЬ ПОРТАЛ" IsToggle="False" Height="40" FontSize="15" />
                         <c:SlashToggle x:Name="DcForgetBtn" Text="СБРОСИТЬ КЛЮЧИ" IsToggle="False" Sound="cancel" Height="40" FontSize="15"
                                        Hint="Отключиться от Discord и удалить сохранённые ID, secret и разрешение" />
+                        <c:SlashToggle x:Name="DcDebugBtn" Text="ЧТО ОТДАЁТ DISCORD" IsToggle="False" Height="40" FontSize="13"
+                                       Hint="Открыть в Блокноте последний ответ Discord о голосовом канале — по нему видно, какие данные о людях он передаёт" />
                         <c:SlashToggle x:Name="DcCloseBtn" Text="ЗАКРЫТЬ" IsToggle="False" Sound="cancel" Height="40" FontSize="15" />
                     </WrapPanel>
                 </StackPanel>

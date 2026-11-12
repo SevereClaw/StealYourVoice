@@ -74,6 +74,17 @@ public partial class MainWindow
             ShowOverlay(FriendsOverlay);
         };
         DcCloseBtn.Click += _ => FriendsOverlay.Visibility = Visibility.Collapsed;
+        DcDebugBtn.Click += _ =>
+        {
+            try
+            {
+                if (System.IO.File.Exists(DcDebugFile))
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("notepad.exe", $"\"{DcDebugFile}\"") { UseShellExecute = true });
+                else _dcStatus = "ЛОГ ПОЯВИТСЯ, КОГДА ТЫ ЗАЙДЁШЬ В ГОЛОСОВОЙ КАНАЛ";
+                DcRender();
+            }
+            catch { /* ignore */ }
+        };
         DcPortalBtn.Click += _ =>
         {
             try
@@ -332,6 +343,16 @@ public partial class MainWindow
             }
 
             var data = await dc.Command("GET_SELECTED_VOICE_CHANNEL", new Dictionary<string, object>());
+
+            // keep the last raw answer on disk: shows exactly which fields Discord gives us (e.g. stream status)
+            if (_dcPollCount % 5 == 1 && data.ValueKind == JsonValueKind.Object)
+            {
+                var raw = data.GetRawText();
+                _ = System.Threading.Tasks.Task.Run(() =>
+                {
+                    try { System.IO.File.WriteAllText(DcDebugFile, raw); } catch { /* ignore */ }
+                });
+            }
             if (_dc != dc) return;
 
             if (data.ValueKind != JsonValueKind.Object)
@@ -381,9 +402,12 @@ public partial class MainWindow
                     {
                         micOff = DcFlag(st, "self_mute") || DcFlag(st, "mute") || DcFlag(st, "suppress");
                         deaf = DcFlag(st, "self_deaf") || DcFlag(st, "deaf");
-                        live = DcFlag(st, "self_stream");
-                        cam = DcFlag(st, "self_video");
+                        live = DcFlag(st, "self_stream") || DcFlag(st, "stream") || DcFlag(st, "streaming");
+                        cam = DcFlag(st, "self_video") || DcFlag(st, "video");
                     }
+                    // some clients put these next to voice_state instead of inside it
+                    live |= DcFlag(vs, "self_stream") || DcFlag(vs, "stream") || DcFlag(vs, "streaming");
+                    cam |= DcFlag(vs, "self_video") || DcFlag(vs, "video");
                     _dcFlags[id] = (micOff, deaf, live, cam);
 
                     if (id == _dcUserId)
@@ -803,6 +827,9 @@ public partial class MainWindow
         _dcLoud[only] = next;
         UpdateSpeakers();
     }
+
+    private static readonly string DcDebugFile = System.IO.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StealYourVoice", "discord-channel.json");
 
     private static bool DcFlag(JsonElement e, string name) =>
         e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.True;
