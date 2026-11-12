@@ -316,7 +316,7 @@
                             <TextBlock Style="{StaticResource SubHeader}" Text="ПРОГРАММА" Margin="0,14,0,6" />
                             <WrapPanel>
                                 <c:SlashToggle x:Name="SfxT" Text="ЗВУКИ" FontSize="12" Height="32" Tilt="1.5"
-                                   Hint="Звуки интерфейса. Свои .wav (hover, click, confirm, cancel, whoosh, tab) можно положить в папку звуков — см. меню иконки в трее" />
+                                   Hint="Звуки интерфейса. Свои .wav (hover, click, confirm, cancel, whoosh, tab, preset) можно положить в папку звуков — см. меню иконки в трее" />
                                 <c:SlashToggle x:Name="AutostartT" Text="АВТОЗАПУСК" FontSize="12" Height="32" Tilt="-1"
                                    Hint="Запускаться вместе с Windows (сразу в трей)" />
                             </WrapPanel>

@@ -411,7 +411,7 @@ public partial class MainWindow : Window
 
     private SlashToggle AddPresetButton(string text, string hint, double tilt, Action onClick)
     {
-        var b = new SlashToggle { Text = text, IsToggle = false, Tilt = tilt, Hint = hint, Height = 34, FontSize = 14, Sound = "confirm" };
+        var b = new SlashToggle { Text = text, IsToggle = false, Tilt = tilt, Hint = hint, Height = 34, FontSize = 14, Sound = "" }; // the banner plays the preset chime
         b.Click += _ => onClick();
         PresetPanel.Children.Add(b);
         return b;

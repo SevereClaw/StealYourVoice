@@ -15,7 +15,7 @@ public static class Sfx
     public static readonly string Folder =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StealYourVoice", "sounds");
 
-    public static readonly string[] Names = { "hover", "click", "confirm", "cancel", "whoosh", "tab" };
+    public static readonly string[] Names = { "hover", "click", "confirm", "cancel", "whoosh", "tab", "preset" };
 
     private const int Rate = 44100;
     private static readonly Dictionary<string, SoundPlayer> Players = new();
@@ -66,8 +66,9 @@ public static class Sfx
     {
         "hover" => Blip(2400, 0.018, 0.18, square: false),
         "click" => Mix(Blip(1500, 0.035, 0.35, square: true), Noise(0.012, 0.25, 0)),
-        "confirm" => Concat(Stab(988, 0.055), Stab(1480, 0.11)),
-        "cancel" => Concat(Stab(740, 0.05), Stab(494, 0.10)),
+        "confirm" => Normalize(Concat(Bell(784, 0.06, 0.7), Bell(1175, 0.16, 1.0)), 0.18),
+        "cancel" => Normalize(Concat(Bell(659, 0.06, 0.7), Bell(440, 0.16, 1.0)), 0.16),
+        "preset" => Chime(),
         "whoosh" => Whoosh(0.26),
         "tab" => SoftPluck(),
         _ => Blip(1000, 0.03, 0.3, false)
@@ -141,6 +142,40 @@ public static class Sfx
             s[i] = (float)(hp * env * 2.6);
         }
         return Normalize(s, 0.22);
+    }
+
+    /// <summary>Round sine note with a soft attack — mellow replacement for the old saw stabs.</summary>
+    private static float[] Bell(double freq, double dur, double vol)
+    {
+        int n = (int)(dur * Rate);
+        var s = new float[n];
+        for (int i = 0; i < n; i++)
+        {
+            double t = (double)i / Rate;
+            double v = Math.Sin(2 * Math.PI * freq * t) + 0.25 * Math.Sin(2 * Math.PI * freq * 2 * t) * Math.Exp(-t * 40);
+            double env = Math.Min(1, t * 500) * Math.Exp(-t * 18) * Math.Min(1, (dur - t) * 200); // fade the tail, no click
+            s[i] = (float)(v * env * vol);
+        }
+        return s;
+    }
+
+    /// <summary>Preset switched: three soft overlapping notes rising, like a quiet music-box arpeggio.</summary>
+    private static float[] Chime()
+    {
+        double[] notes = { 523.25, 659.25, 783.99 };
+        int step = (int)(0.07 * Rate), len = (int)(0.42 * Rate);
+        var s = new float[step * (notes.Length - 1) + len];
+        for (int k = 0; k < notes.Length; k++)
+        {
+            for (int i = 0; i < len; i++)
+            {
+                double t = (double)i / Rate;
+                double v = Math.Sin(2 * Math.PI * notes[k] * t) + 0.12 * Math.Sin(2 * Math.PI * notes[k] * 3 * t) * Math.Exp(-t * 30);
+                double env = Math.Min(1, t * 300) * Math.Exp(-t * 7.5) * Math.Min(1, (len - i) / (0.03 * Rate));
+                s[k * step + i] += (float)(v * env);
+            }
+        }
+        return Normalize(s, 0.14);
     }
 
     /// <summary>Muted wooden "tock" for tabs: a warm sine with a soft attack and a quick, round decay.</summary>

@@ -234,7 +234,7 @@ public partial class MainWindow
     {
         _presetToast ??= new BannerToast(118);
         _presetToast.Pop(label, title.Length > 22 ? title[..21] + "…" : title, null, off, false);
-        Audio.Sfx.Play("whoosh");
+        Audio.Sfx.Play("preset");
     }
 
     private static string PresetTitle(UserPreset p) =>
