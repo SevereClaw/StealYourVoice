@@ -17,6 +17,10 @@ public sealed class UserPreset
     public bool B1 { get; set; } = true;
     public float OutGain { get; set; } // Bus B1 gain
 
+    /// <summary>Microphone device that was selected when the preset was saved (empty = don't touch the device).</summary>
+    public string DeviceName { get; set; } = "";
+    public string DeviceKind { get; set; } = ""; // wdm / mme / ks
+
     /// <summary>Process name (without .exe) that auto-applies this preset while it runs.</summary>
     public string? Process { get; set; }
 }

@@ -374,7 +374,8 @@ public partial class MainWindow : Window
         {
             var preset = p;
             var btn = AddPresetButton(PresetTitle(preset),
-                $"Громкость {preset.Gain:0.#} dB, шумодав {preset.Gate:0.#}, компрессор {preset.Comp:0.#}",
+                $"Громкость {preset.Gain:0.#} dB, шумодав {preset.Gate:0.#}, компрессор {preset.Comp:0.#}" +
+                (string.IsNullOrWhiteSpace(preset.DeviceName) ? "" : $"\nМикрофон: {preset.DeviceName}"),
                 rnd.Next(-20, 21) / 10.0, () => ApplyUserPreset(preset));
 
             var menu = new ContextMenu();
@@ -446,10 +447,40 @@ public partial class MainWindow : Window
         A1 = _vm.Get(S("A1")) >= 0.5f,
         B1 = _vm.Get(S("B1")) >= 0.5f,
         OutGain = _vm.Get(B1("Gain")),
+        DeviceName = _vm.GetString(S("device.name")),
+        DeviceKind = CurrentDeviceKind(),
     };
+
+    /// <summary>Voicemeeter tells us the device name but not its driver type, so look it up in the device list.</summary>
+    private string CurrentDeviceKind()
+    {
+        var name = _vm.GetString(S("device.name"));
+        if (string.IsNullOrWhiteSpace(name)) return "";
+        var matches = _vm.InputDevices().Where(d => d.Name == name).ToList();
+        return matches.FirstOrDefault(d => d.Kind == "wdm")?.Kind ?? matches.FirstOrDefault()?.Kind ?? "";
+    }
+
+    /// <summary>Switch the mic input to the device stored in the preset (only if it differs and is plugged in).</summary>
+    private void ApplyPresetDevice(UserPreset p)
+    {
+        if (string.IsNullOrWhiteSpace(p.DeviceName)) return;
+        if (_vm.GetString(S("device.name")) == p.DeviceName) return; // switching restarts audio — don't do it needlessly
+
+        var devices = _vm.InputDevices().Where(d => d.Name == p.DeviceName).ToList();
+        var dev = devices.FirstOrDefault(d => d.Kind == p.DeviceKind)
+                  ?? devices.FirstOrDefault(d => d.Kind == "wdm")
+                  ?? devices.FirstOrDefault();
+        if (dev == null)
+        {
+            StatusText.Text = $"МИКРОФОН ИЗ ПРЕСЕТА НЕ ПОДКЛЮЧЁН: {p.DeviceName.ToUpperInvariant()}";
+            return;
+        }
+        _vm.SetStripDevice(_strip, dev);
+    }
 
     private void ApplyUserPreset(UserPreset p)
     {
+        ApplyPresetDevice(p);
         _vm.Script(
             $"{S("Gain")}={VmClient.F(p.Gain)};" +
             $"{S("Gate")}={VmClient.F(p.Gate)};" +
