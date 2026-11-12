@@ -364,6 +364,24 @@ public partial class MainWindow
         }
         else AddRow(Sev.Info, "Не удалось прочитать частоты устройств Windows. Проверь вручную, что везде стоит 48000 Hz.");
 
+        // recorders (MidnightClips, ShadowPlay "system sounds") capture the default playback device as a whole
+        var defOut = DefaultOutputName();
+        if (defOut.Length > 0 && _vm.Type != VmType.Standard)
+        {
+            bool vmMain = defOut.Contains("Voicemeeter", StringComparison.OrdinalIgnoreCase) &&
+                          !defOut.Contains("AUX", StringComparison.OrdinalIgnoreCase) &&
+                          !defOut.Contains("VAIO3", StringComparison.OrdinalIgnoreCase);
+            if (vmMain) AddRow(Sev.Ok, "Звук Windows по умолчанию идёт в Voicemeeter Input — программы записи пишут только его, без Discord.");
+            else
+            {
+                Count(Sev.Warn);
+                AddRow(Sev.Warn, $"Устройство воспроизведения по умолчанию — «{defOut}». Программы записи (MidnightClips, «Системные звуки» ShadowPlay) " +
+                                 "пишут его целиком; если это наушники, в запись попадает всё, что ты слышишь, включая друзей. " +
+                                 "Сделай по умолчанию «Voicemeeter Input».",
+                    "ОТКРЫТЬ «ЗВУК»", WindowsAudioChecks.OpenSoundPanel);
+            }
+        }
+
         if (WindowsAudioChecks.MicrophoneBlocked())
         {
             Count(Sev.Fail);

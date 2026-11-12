@@ -32,6 +32,18 @@ public partial class MainWindow
     private MicToast? _volToast;
     private const int VolUpId = 0x5360, VolDownId = 0x5361, VolMuteId = 0x5362;
 
+    /// <summary>Name of the Windows default playback device ("" if unknown).</summary>
+    private static string DefaultOutputName()
+    {
+        try
+        {
+            using var en = new NAudio.CoreAudioApi.MMDeviceEnumerator();
+            using var dev = en.GetDefaultAudioEndpoint(NAudio.CoreAudioApi.DataFlow.Render, NAudio.CoreAudioApi.Role.Multimedia);
+            return dev.FriendlyName;
+        }
+        catch { return ""; }
+    }
+
     private static bool DefaultOutputIsVoicemeeter()
     {
         try
