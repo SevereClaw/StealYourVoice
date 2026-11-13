@@ -168,6 +168,7 @@ public partial class MainWindow : Window
         if (_tick % 60 == 30) CheckMicPlugged();
         if (_tick % 3 == 0) FollowVoiceTick();
         if (_tick % 3 == 1) TwoMicTick();
+        if (_tick % 60 == 15) AppsTick();
         if (_tick % 150 == 0) SyncVolumeKeys();
 
         if (!_vm.IsConnected)

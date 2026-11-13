@@ -199,6 +199,13 @@
                                            Hint="Общая громкость выхода A1: игра, друзья и всё остальное разом. Выше 0 — усиление, до +12 dB. Двойной клик — 0 dB" />
                         </Grid>
 
+                            <TextBlock Style="{StaticResource SubHeader}" Text="ПРОГРАММЫ" Margin="0,16,0,2" />
+                            <TextBlock Text="Громкость каждой программы отдельно — как в микшере Windows" Foreground="#9A9A9A" FontSize="12" Margin="2,0,0,10" />
+                            <TextBlock x:Name="AppsEmpty" Text="Сейчас ни одна программа не играет звук" Foreground="#808080" FontSize="13" Margin="2,0,0,6" Visibility="Collapsed" />
+                            <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
+                                <StackPanel x:Name="AppsPanel" Margin="0,0,10,0" />
+                            </ScrollViewer>
+
                         
                         </StackPanel>
                     </Border></Grid>

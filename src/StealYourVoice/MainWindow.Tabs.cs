@@ -84,6 +84,7 @@ public partial class MainWindow
             // Hidden, not Collapsed: the window keeps the height of the tallest page and doesn't jump
             _pages[i].Visibility = i == idx ? Visibility.Visible : Visibility.Hidden;
         }
+        if (idx == 1) AppsTick(); // fill the program list right away
         if (!animate || !changed) return;
 
         Audio.Sfx.Play("tab");
