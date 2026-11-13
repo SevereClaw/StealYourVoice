@@ -477,7 +477,7 @@ public partial class MainWindow
     private void SyncMouseHook()
     {
         bool want = _settings.SpeakersCorner != 0 || _settings.OverlayCorner != 0;
-        if (want) _mouseHook ??= new MouseHook { Handler = OnGlobalMouse, EveryMove = () => _spkDragging };
+        if (want) _mouseHook ??= new MouseHook { Handler = HookFilter, EveryMove = () => _spkDragging };
         else
         {
             _mouseHook?.Dispose();
@@ -487,6 +487,40 @@ public partial class MainWindow
             _dragOverlay = null;
             _dragPerson = null;
         }
+    }
+
+    private int _movePosted, _moveX, _moveY;
+
+    /// <summary>
+    /// Runs on the hook thread for every mouse event of the system. Plain movement and clicks without
+    /// Ctrl/Shift/Alt go straight back to the game; only the rare modified clicks wait for the UI to decide.
+    /// </summary>
+    private bool HookFilter(int msg, int x, int y, int delta)
+    {
+        if (msg == MouseHook.WM_MOUSEMOVE)
+        {
+            // hover / drag: hand the latest position to the UI, never more than one pending
+            _moveX = x;
+            _moveY = y;
+            if (System.Threading.Interlocked.Exchange(ref _movePosted, 1) == 0)
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    System.Threading.Interlocked.Exchange(ref _movePosted, 0);
+                    OnGlobalMouse(MouseHook.WM_MOUSEMOVE, _moveX, _moveY, 0);
+                }), System.Windows.Threading.DispatcherPriority.Input);
+            return false;
+        }
+
+        if (!_spkDragging && !_swallowUp && !MouseHook.CtrlDown && !MouseHook.ShiftDown && !MouseHook.AltDown)
+            return false;
+
+        try
+        {
+            return Dispatcher.Invoke(() => OnGlobalMouse(msg, x, y, delta),
+                System.Windows.Threading.DispatcherPriority.Send, System.Threading.CancellationToken.None,
+                TimeSpan.FromMilliseconds(120));
+        }
+        catch { return false; } // UI busy — let the click through rather than freeze the mouse
     }
 
     /// <summary>The shared list plus every plate that was pulled out of it.</summary>

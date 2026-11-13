@@ -25,6 +25,9 @@ public partial class MainWindow
     // ───────────────────────── keyboard volume keys → headphones bus ─────────────────────────
 
     private bool _volKeysOn;
+    private bool _defaultIsVm;
+    private IntPtr _lastFgHwnd;
+    private string? _lastFgName;
     // Voicemeeter reports a changed value with a delay, so during a fast roll we count from our own number
     private double _volLocal;
     private bool _volMutedLocal;
@@ -62,7 +65,12 @@ public partial class MainWindow
     private void SyncVolumeKeys()
     {
         if (_hwnd == IntPtr.Zero) return;
-        bool want = _settings.VolumeKeys && _vm.IsConnected && DefaultOutputIsVoicemeeter();
+        if (Audio.AudioWatch.DefaultDirty)
+        {
+            Audio.AudioWatch.DefaultDirty = false;
+            _defaultIsVm = DefaultOutputIsVoicemeeter();
+        }
+        bool want = _settings.VolumeKeys && _vm.IsConnected && _defaultIsVm;
         if (want == _volKeysOn) return;
         if (want)
         {
@@ -471,7 +479,16 @@ public partial class MainWindow
         if (!_vm.IsConnected) return;
         if (!_settings.Presets.Any(p => !string.IsNullOrEmpty(p.Process))) return;
 
-        var name = ForegroundProcessName();
+        // same window as last time → same program; skip opening the process again
+        var fg = GetForegroundWindow();
+        string? name;
+        if (fg == _lastFgHwnd) name = _lastFgName;
+        else
+        {
+            name = ForegroundProcessName();
+            _lastFgHwnd = fg;
+            _lastFgName = name;
+        }
         if (name == null || string.Equals(name, _activeGame, StringComparison.OrdinalIgnoreCase)) return;
         var hit = _settings.Presets.FirstOrDefault(p => string.Equals(p.Process, name, StringComparison.OrdinalIgnoreCase));
         if (hit == null) return;
@@ -490,9 +507,15 @@ public partial class MainWindow
         try
         {
             var bound = _settings.Presets.Where(p => !string.IsNullOrEmpty(p.Process)).Select(p => p.Process!).ToList();
-            var running = await Task.Run(RunningProcessNames);
+            // ask only about the few bound programs instead of listing every process in the system
+            bool anyRunning = await Task.Run(() => bound.Any(n =>
+            {
+                var ps = Process.GetProcessesByName(n);
+                foreach (var p in ps) p.Dispose();
+                return ps.Length > 0;
+            }));
             if (!_vm.IsConnected || _activeGame == null) return;
-            if (bound.Any(running.Contains)) return;
+            if (anyRunning) return;
 
             _activeGame = null;
             if (_beforeGame != null)

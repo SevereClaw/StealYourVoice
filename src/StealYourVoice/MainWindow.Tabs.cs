@@ -114,13 +114,14 @@ public partial class MainWindow
     private void TwoMicTick()
     {
         if (!_settings.TwoMicWarn || !_vm.IsConnected) return;
+        if (_routedStrips == null || _routedStrips.Length != _vm.HardwareStrips) RefreshRoutedStrips();
+        int routed = 0;
+        foreach (var r in _routedStrips!) if (r) routed++;
+        if (routed < 2) { _twoMicSince = DateTime.MinValue; return; } // can't be two — skip the meters entirely
+
         var live = new List<int>();
-        for (int i = 0; i < _vm.HardwareStrips; i++)
-        {
-            if (_vm.Get($"Strip[{i}].Mute") >= 0.5f) continue;
-            if (_vm.Get($"Strip[{i}].B1") < 0.5f && _vm.Get($"Strip[{i}].B2") < 0.5f) continue;
-            if (Controls.P5.ToDb(_vm.StripLevel(i)) > -45) live.Add(i);
-        }
+        for (int i = 0; i < _routedStrips.Length; i++)
+            if (_routedStrips[i] && Controls.P5.ToDb(_vm.StripLevel(i)) > -45) live.Add(i);
 
         var now = DateTime.Now;
         if (live.Count < 2) { _twoMicSince = DateTime.MinValue; return; }
@@ -140,6 +141,20 @@ public partial class MainWindow
         _tray?.ShowBalloonTip(3000, "Steal Your Voice",
             "Одновременно слышно два микрофона: " + string.Join(" и ", names) + ". Выключи B1/B2 или MUTE на лишнем входе.",
             System.Windows.Forms.ToolTipIcon.Warning);
+    }
+
+    private bool[]? _routedStrips;
+
+    /// <summary>Which hardware inputs have a device, aren't muted and go to B1/B2. Re-read only when Voicemeeter reports changes.</summary>
+    private void RefreshRoutedStrips()
+    {
+        int n = _vm.HardwareStrips;
+        var r = new bool[n];
+        for (int i = 0; i < n; i++)
+            r[i] = _vm.Get($"Strip[{i}].Mute") < 0.5f
+                   && (_vm.Get($"Strip[{i}].B1") >= 0.5f || _vm.Get($"Strip[{i}].B2") >= 0.5f)
+                   && !string.IsNullOrWhiteSpace(_vm.GetString($"Strip[{i}].device.name"));
+        _routedStrips = r;
     }
 
     // ───────────────────────── switch to the mic you are talking into ─────────────────────────
@@ -234,6 +249,9 @@ public partial class MainWindow
     private async void CheckMicPlugged()
     {
         if (!_vm.IsConnected) return;
+        // Windows tells us when a device is plugged / unplugged — no need to scan otherwise
+        if (_knownMics != null && !Audio.AudioWatch.DevicesDirty) return;
+        Audio.AudioWatch.DevicesDirty = false;
         var names = await System.Threading.Tasks.Task.Run(() =>
         {
             var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

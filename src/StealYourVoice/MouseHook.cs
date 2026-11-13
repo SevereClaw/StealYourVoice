@@ -42,6 +42,15 @@ internal sealed class MouseHook : IDisposable
 
     private readonly HookProc _proc; // keep the delegate alive
     private IntPtr _hook;
+    private readonly System.Threading.Thread _thread;
+    private volatile uint _threadId;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MSG { public IntPtr Hwnd; public uint Message; public IntPtr WParam, LParam; public uint Time; public int X, Y; }
+
+    [DllImport("user32.dll")] private static extern int GetMessage(out MSG msg, IntPtr hwnd, uint min, uint max);
+    [DllImport("user32.dll")] private static extern bool PostThreadMessage(uint threadId, uint msg, IntPtr w, IntPtr l);
+    [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
 
     /// <summary>(message, x, y, wheel delta) → true to swallow the event.</summary>
     public Func<int, int, int, int, bool>? Handler;
@@ -51,10 +60,24 @@ internal sealed class MouseHook : IDisposable
 
     private long _lastMove;
 
+    /// <summary>
+    /// The hook lives on its own thread with its own message loop. Windows routes EVERY mouse event of the
+    /// whole system through this hook, so it must never wait for our window to finish drawing.
+    /// The handler is called on that thread.
+    /// </summary>
     public MouseHook()
     {
         _proc = Callback;
-        _hook = SetWindowsHookEx(14 /* WH_MOUSE_LL */, _proc, GetModuleHandle(null), 0);
+        _thread = new System.Threading.Thread(() =>
+        {
+            _threadId = GetCurrentThreadId();
+            _hook = SetWindowsHookEx(14 /* WH_MOUSE_LL */, _proc, GetModuleHandle(null), 0);
+            while (GetMessage(out _, IntPtr.Zero, 0, 0) > 0) { /* hooks are called from inside GetMessage */ }
+            if (_hook != IntPtr.Zero) UnhookWindowsHookEx(_hook);
+            _hook = IntPtr.Zero;
+        })
+        { IsBackground = true, Name = "mouse hook", Priority = System.Threading.ThreadPriority.AboveNormal };
+        _thread.Start();
     }
 
     private IntPtr Callback(int code, IntPtr wParam, IntPtr lParam)
@@ -87,7 +110,8 @@ internal sealed class MouseHook : IDisposable
 
     public void Dispose()
     {
-        if (_hook != IntPtr.Zero) UnhookWindowsHookEx(_hook);
-        _hook = IntPtr.Zero;
+        Handler = null;
+        var id = _threadId;
+        if (id != 0) PostThreadMessage(id, 0x0012 /* WM_QUIT */, IntPtr.Zero, IntPtr.Zero);
     }
 }

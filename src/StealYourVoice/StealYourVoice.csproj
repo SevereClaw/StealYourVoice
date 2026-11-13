@@ -12,13 +12,22 @@
     <AssemblyName>StealYourVoice</AssemblyName>
     <RootNamespace>StealYourVoice</RootNamespace>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
-    <Version>0.24.1</Version>
+    <Version>0.25.0</Version>
     <Product>Steal Your Voice</Product>
     <Description>Persona 5 style control panel for Voicemeeter</Description>
+
+    <!-- lighter runtime: only Russian/English resource packs, no background GC thread, GC returns memory sooner -->
+    <SatelliteResourceLanguages>ru;en</SatelliteResourceLanguages>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <TieredPGO>true</TieredPGO>
   </PropertyGroup>
 
   <ItemGroup>
     <Resource Include="Assets\app.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="5" />
   </ItemGroup>
 
   <ItemGroup>

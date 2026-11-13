@@ -23,6 +23,10 @@ public partial class MainWindow : Window
     private bool _exiting;
     private bool _balloonShown;
     private bool _paramsDirty;
+    private Audio.AudioWatch? _audioWatch;
+
+    [DllImport("psapi.dll")]
+    private static extern bool EmptyWorkingSet(IntPtr process);
     private readonly Updater _updater = new();
     private readonly DispatcherTimer _updateTimer;
     private bool _updating;
@@ -248,6 +252,7 @@ public partial class MainWindow : Window
 
         RefreshExtras();
         CheckMicChanged();
+        RefreshRoutedStrips();
         UpdateTrayMute();
     }
 
@@ -646,6 +651,7 @@ public partial class MainWindow : Window
     {
         _ducker = new Audio.Ducker(_vm);
         Audio.AppDucker.RestoreAfterCrash();
+        _audioWatch = new Audio.AudioWatch();
         // Windows shutting down / logging off: never leave anything ducked behind
         Application.Current.SessionEnding += (_, _) => _ducker?.Restore();
         UpdateExcludeButton();
@@ -756,7 +762,7 @@ public partial class MainWindow : Window
         var micDb = P5.ToDb(Math.Max(l, r));
         bool voice = _settings.DuckEnabled && micDb > _settings.DuckThreshold;
         _ducker.Tick(voice || (friendsOn && _friendsTalking), targets, _settings.DuckAmount);
-        if (!IsVisible) return; // the rest only updates the status text
+        if (!IsVisible || _tick % 6 != 0) return; // the rest only updates the status text — 5 times a second is plenty
 
         // is anything actually playing through the ducked inputs? (pre-fader, so ducking itself doesn't fool us)
         double gameDb = -90;
@@ -944,6 +950,17 @@ public partial class MainWindow : Window
     private void HideToTray()
     {
         Hide();
+        // in the tray nothing needs the window's memory: give it back to Windows
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            try
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                EmptyWorkingSet(System.Diagnostics.Process.GetCurrentProcess().Handle);
+            }
+            catch { /* ignore */ }
+        }), DispatcherPriority.ApplicationIdle);
         if (_balloonShown) return;
         _balloonShown = true;
         _tray?.ShowBalloonTip(1500, "Steal Your Voice", "Я в трее. Клик по иконке — вернуть окно.",
@@ -984,6 +1001,7 @@ public partial class MainWindow : Window
         _settings.Flush();
         _toast?.Close();
         _micWatcher?.Dispose();
+        _audioWatch?.Dispose();
         _warnToast?.Close();
         ReleaseVolumeKeys();
         _volToast?.Close();
