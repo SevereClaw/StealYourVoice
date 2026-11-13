@@ -29,7 +29,7 @@ public partial class MainWindow
     private double _volLocal;
     private bool _volMutedLocal;
     private DateTime _volLast = DateTime.MinValue;
-    private MicToast? _volToast;
+    private VolumeToast? _volToast;
     private const int VolUpId = 0x5360, VolDownId = 0x5361, VolMuteId = 0x5362;
 
     /// <summary>Name of the Windows default playback device ("" if unknown).</summary>
@@ -90,33 +90,30 @@ public partial class MainWindow
 
         bool rolling = (DateTime.Now - _volLast).TotalSeconds < 1.5;
         bool muted = rolling ? _volMutedLocal : _vm.Get("Bus[0].Mute") >= 0.5f;
-        string text;
-        double level = -1;
+        double shownDb;
         if (id == VolMuteId)
         {
             _vm.Set("Bus[0].Mute", muted ? 0 : 1);
-            text = muted ? "ЗВУК ВКЛ" : "ЗВУК ВЫКЛ";
             muted = !muted;
+            shownDb = rolling ? _volLocal : Math.Round(_vm.Get("Bus[0].Gain"));
         }
         else
         {
             if (muted) { _vm.Set("Bus[0].Mute", 0); muted = false; }
-            double from = rolling ? _volLocal : Math.Round(_vm.Get("Bus[0].Gain") / 2.0) * 2;
-            double g = Math.Clamp(from + (id == VolUpId ? 2 : -2), -60, 12);
+            double from = rolling ? _volLocal : Math.Round(_vm.Get("Bus[0].Gain"));
+            double g = Math.Clamp(from + (id == VolUpId ? 1 : -1), -60, 12);
             _volLocal = g;
             _vm.Set("Bus[0].Gain", (float)g);
             if (!PhonesGainS.IsDragging) PhonesGainS.Value = g;
-            text = $"ГРОМКОСТЬ {g:+0;-0;0} dB";
-            level = (g + 60) / 72.0;
+            shownDb = g;
         }
 
-        if (!rolling && id == VolMuteId) _volLocal = Math.Round(_vm.Get("Bus[0].Gain") / 2.0) * 2;
+        if (!rolling && id == VolMuteId) _volLocal = Math.Round(_vm.Get("Bus[0].Gain"));
         _volMutedLocal = muted;
         _volLast = DateTime.Now;
 
-        _volToast ??= new MicToast();
-        if (level >= 0) _volToast.FlashLevel(text, level);
-        else _volToast.Flash(text, muted);
+        _volToast ??= new VolumeToast();
+        _volToast.ShowLevel(shownDb, muted, id == VolUpId);
         return true;
     }
 
