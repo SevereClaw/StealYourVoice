@@ -120,7 +120,7 @@ public sealed class Updater
                     {
                         var entry = zip.GetEntry(AssetName);
                         if (entry == null) return false;
-                        entry.ExtractToFile(target, true);
+                        System.IO.Compression.ZipFileExtensions.ExtractToFile(entry, target, true);
                         if (new FileInfo(target).Length != entry.Length) { File.Delete(target); return false; }
                     }
                 }
