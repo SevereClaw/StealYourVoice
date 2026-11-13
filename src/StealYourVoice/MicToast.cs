@@ -120,7 +120,7 @@ public sealed class MicToast : Window
         if (!IsVisible) Show();
         UpdateLayout();
 
-        var area = SystemParameters.WorkArea;
+        var area = NotifyArea.Get(this);
         Left = area.Left + (area.Width - ActualWidth) / 2;
         Top = area.Top + 40;
 

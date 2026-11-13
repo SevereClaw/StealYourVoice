@@ -135,7 +135,7 @@ public sealed class BannerToast : Window
         Opacity = 1;
         if (!IsVisible) Show();
         UpdateLayout();
-        var area = SystemParameters.WorkArea;
+        var area = NotifyArea.Get(this);
         Left = area.Left + (area.Width - ActualWidth) / 2;
         Top = area.Top + _topOffset;
 

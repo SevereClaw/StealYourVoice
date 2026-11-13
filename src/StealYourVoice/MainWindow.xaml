@@ -319,6 +319,10 @@
                                    Hint="Полоска уровня микрофона поверх игры: полупрозрачная, пока молчишь, яркая, когда говоришь или при MIC OFF. Shift + тащить — подвинуть, Shift + колёсико — размер, Ctrl + колёсико — громкость микрофона. Нажатие на кнопку — следующий угол" />
                                 <c:SlashToggle x:Name="ToastT" Text="ПЛАШКА MIC OFF" FontSize="12" Height="32" Tilt="1"
                                    Hint="Показывать «MIC OFF / MIC ON» поверх экрана при переключении" />
+                                <c:SlashToggle x:Name="NotifyScreenBtn" IsToggle="False" Text="УВЕДОМЛЕНИЯ: ОСНОВНОЙ МОНИТОР" FontSize="12" Height="32" Tilt="0.5"
+                               Hint="На каком мониторе появляются баннеры, MIC OFF и громкость. Каждое нажатие — следующий монитор, на нём сразу покажется проверочный баннер" />
+                                <c:SlashToggle x:Name="TwoMicT" Text="ДВА МИКРОФОНА — ПРЕДУПРЕДИТЬ" FontSize="12" Height="32" Tilt="-1"
+                               Hint="Если в Discord / запись одновременно идёт голос с двух микрофонов (двух входов Voicemeeter), появится предупреждение" />
                             </WrapPanel>
                             <TextBlock Text="Индикатор: Shift + тащить — подвинуть, Shift + колёсико — размер, Ctrl + колёсико — громкость микрофона" Foreground="#9A9A9A" FontSize="12" TextWrapping="Wrap" Margin="2,0,0,10" />
                             <TextBlock Style="{StaticResource SubHeader}" Text="ПРОГРАММА" Margin="0,14,0,6" />

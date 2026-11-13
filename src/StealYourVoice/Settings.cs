@@ -50,6 +50,12 @@ public sealed class Settings
     /// <summary>Start talking into another mic that has a preset → switch the input (and the preset) to it.</summary>
     public bool FollowVoice { get; set; }
 
+    /// <summary>Monitor for pop-up notifications: 0 = main, 1… = other monitors left to right.</summary>
+    public int NotifyScreen { get; set; }
+
+    /// <summary>Warn when two microphones are heard in Discord / the recording at the same time.</summary>
+    public bool TwoMicWarn { get; set; } = true;
+
     /// <summary>
     /// A virtual bus (B2 on Banana, B3 on Potato) carries only Discord, so CyberCall can subtitle friends
     /// while recorders never see that bus.

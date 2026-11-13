@@ -52,6 +52,22 @@ public partial class MainWindow
                 : "ПЕРЕКЛЮЧЕНИЕ ПО ГОЛОСУ ВЫКЛЮЧЕНО";
         };
 
+        NotifyArea.Screen = Math.Max(0, _settings.NotifyScreen);
+        UpdateNotifyScreenBtn();
+        NotifyScreenBtn.Click += _ =>
+        {
+            int n = NotifyArea.Count;
+            _settings.NotifyScreen = n <= 1 ? 0 : (_settings.NotifyScreen + 1) % n;
+            _settings.Save();
+            NotifyArea.Screen = _settings.NotifyScreen;
+            UpdateNotifyScreenBtn();
+            _warnToast ??= new BannerToast(200);
+            _warnToast.Pop("УВЕДОМЛЕНИЯ БУДУТ ЗДЕСЬ", _settings.NotifyScreen == 0 ? "ОСНОВНОЙ МОНИТОР" : $"МОНИТОР {_settings.NotifyScreen + 1}", null, false, false);
+        };
+
+        TwoMicT.IsChecked = _settings.TwoMicWarn;
+        TwoMicT.Click += t => { _settings.TwoMicWarn = t.IsChecked; _settings.Save(); };
+
         MicPresetT.IsChecked = _settings.MicPresetAuto;
         MicPresetT.Click += t => { _settings.MicPresetAuto = t.IsChecked; _settings.Save(); };
     }
@@ -77,6 +93,52 @@ public partial class MainWindow
         move.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(60, 0, TimeSpan.FromMilliseconds(260))
             { EasingFunction = new BackEase { Amplitude = 0.35, EasingMode = EasingMode.EaseOut } });
         page.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180)));
+    }
+
+    private BannerToast? _warnToast;
+
+    private void UpdateNotifyScreenBtn()
+    {
+        int n = NotifyArea.Count;
+        NotifyScreenBtn.Text = n <= 1 ? "УВЕДОМЛЕНИЯ: МОНИТОР ОДИН"
+            : _settings.NotifyScreen <= 0 || _settings.NotifyScreen >= n ? "УВЕДОМЛЕНИЯ: ОСНОВНОЙ МОНИТОР"
+            : $"УВЕДОМЛЕНИЯ: МОНИТОР {_settings.NotifyScreen + 1}";
+    }
+
+    // ───────────────────────── two microphones heard at once ─────────────────────────
+
+    private DateTime _twoMicSince = DateTime.MinValue, _twoMicWarned = DateTime.MinValue;
+
+    /// <summary>~10 times a second: two Voicemeeter inputs with a device both carry voice into Discord / recording.</summary>
+    private void TwoMicTick()
+    {
+        if (!_settings.TwoMicWarn || !_vm.IsConnected) return;
+        var live = new List<int>();
+        for (int i = 0; i < _vm.HardwareStrips; i++)
+        {
+            if (_vm.Get($"Strip[{i}].Mute") >= 0.5f) continue;
+            if (_vm.Get($"Strip[{i}].B1") < 0.5f && _vm.Get($"Strip[{i}].B2") < 0.5f) continue;
+            if (Controls.P5.ToDb(_vm.StripLevel(i)) > -45) live.Add(i);
+        }
+
+        var now = DateTime.Now;
+        if (live.Count < 2) { _twoMicSince = DateTime.MinValue; return; }
+        if (_twoMicSince == DateTime.MinValue) { _twoMicSince = now; return; }
+        if ((now - _twoMicSince).TotalMilliseconds < 1200 || (now - _twoMicWarned).TotalSeconds < 60) return;
+
+        _twoMicWarned = now;
+        var names = live.Select(i =>
+        {
+            var d = _vm.GetString($"Strip[{i}].device.name");
+            return string.IsNullOrWhiteSpace(d) ? $"ВХОД {i + 1}" : d;
+        }).ToList();
+        _warnToast ??= new BannerToast(200);
+        _warnToast.Pop("ДВА МИКРОФОНА СЛЫШНО ОДНОВРЕМЕННО", "ВХОДЫ " + string.Join(" И ", live.Select(i => (i + 1).ToString())), null, false, false);
+        Audio.Sfx.Play("cancel");
+        StatusText.Text = "ДВА МИКРОФОНА В DISCORD / ЗАПИСИ: " + string.Join(" + ", names).ToUpperInvariant();
+        _tray?.ShowBalloonTip(3000, "Steal Your Voice",
+            "Одновременно слышно два микрофона: " + string.Join(" и ", names) + ". Выключи B1/B2 или MUTE на лишнем входе.",
+            System.Windows.Forms.ToolTipIcon.Warning);
     }
 
     // ───────────────────────── switch to the mic you are talking into ─────────────────────────
