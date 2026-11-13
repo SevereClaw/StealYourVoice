@@ -16,6 +16,7 @@ public sealed class Updater
 {
     private const string Api = "https://api.github.com/repos/SevereClaw/StealYourVoice/releases/latest";
     private const string AssetName = "StealYourVoice.exe";
+    private const string ZipName = "StealYourVoice-win-x64.zip";
 
     private static readonly HttpClient Http = CreateClient();
 
@@ -65,24 +66,35 @@ public sealed class Updater
             Latest = latest;
             if (Normalize(latest) <= Normalize(Current)) return false;
 
-            string? url = null;
-            long size = 0;
+            // prefer the zip: the exe inside is the same, but the download is less than half the size
+            string? url = null, zipUrl = null;
+            long size = 0, zipSize = 0;
             foreach (var a in root.GetProperty("assets").EnumerateArray())
             {
-                if (a.GetProperty("name").GetString() == AssetName)
+                var name = a.GetProperty("name").GetString();
+                if (name == AssetName)
                 {
                     url = a.GetProperty("browser_download_url").GetString();
                     size = a.GetProperty("size").GetInt64();
                 }
+                else if (name == ZipName)
+                {
+                    zipUrl = a.GetProperty("browser_download_url").GetString();
+                    zipSize = a.GetProperty("size").GetInt64();
+                }
             }
-            if (url == null) return false;
+            if (url == null && zipUrl == null) return false;
 
             var target = ExePath + ".new";
-            using (var resp = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead))
+            bool viaZip = zipUrl != null;
+            var file = viaZip ? ExePath + ".new.zip" : target;
+            long expect = viaZip ? zipSize : size;
+
+            using (var resp = await Http.GetAsync(viaZip ? zipUrl : url, HttpCompletionOption.ResponseHeadersRead))
             {
                 resp.EnsureSuccessStatusCode();
                 await using var src = await resp.Content.ReadAsStreamAsync();
-                await using var dst = File.Create(target);
+                await using var dst = File.Create(file);
                 var buf = new byte[81920];
                 long done = 0;
                 int n;
@@ -90,14 +102,29 @@ public sealed class Updater
                 {
                     await dst.WriteAsync(buf.AsMemory(0, n));
                     done += n;
-                    if (size > 0) progress?.Report((int)(done * 100 / size));
+                    if (expect > 0) progress?.Report((int)(done * 100 / expect));
                 }
             }
 
-            if (size > 0 && new FileInfo(target).Length != size)
+            if (expect > 0 && new FileInfo(file).Length != expect)
             {
-                File.Delete(target);
+                File.Delete(file);
                 return false;
+            }
+
+            if (viaZip)
+            {
+                try
+                {
+                    using (var zip = System.IO.Compression.ZipFile.OpenRead(file))
+                    {
+                        var entry = zip.GetEntry(AssetName);
+                        if (entry == null) return false;
+                        entry.ExtractToFile(target, true);
+                        if (new FileInfo(target).Length != entry.Length) { File.Delete(target); return false; }
+                    }
+                }
+                finally { try { File.Delete(file); } catch { /* ignore */ } }
             }
 
             _downloadedPath = target;
