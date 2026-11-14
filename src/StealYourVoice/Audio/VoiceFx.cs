@@ -16,6 +16,17 @@ public sealed class VoiceParams
     public volatile float Echo;     // 0..1
     public volatile float Cave;     // 0..1  (reverb)
     public volatile int Strip;      // which hardware input is the mic
+    public volatile int AuxChannel = -1; // first channel of the "Voicemeeter AUX" input (your headphones path), -1 = none
+}
+
+/// <summary>A decoded sound being played into the mic (friends hear it) and into AUX (you hear it).</summary>
+public sealed class Clip
+{
+    public float[] Data = Array.Empty<float>(); // interleaved stereo at Voicemeeter's sample rate
+    public int Pos;                             // in frames
+    public volatile float ToFriends = 1, ToMe = 0.8f;
+    public volatile bool Stop;
+    public int Frames => Data.Length / 2;
 }
 
 /// <summary>
@@ -38,6 +49,11 @@ public sealed unsafe class VoiceFx : IDisposable
 
     public readonly VoiceParams P = new();
     public bool Registered { get; private set; }
+    public int SampleRate => _sr;
+
+    /// <summary>Set by the UI thread; the audio thread plays it and clears it when done.</summary>
+    public volatile Clip? Clip;
+    public bool ClipPlaying => Clip != null;
     public string LastError { get; private set; } = "";
 
     private readonly VmNative.AudioCallback _cb; // keep the delegate alive while Voicemeeter holds its pointer
@@ -123,11 +139,35 @@ public sealed unsafe class VoiceFx : IDisposable
             Buffer.MemoryCopy(src, dst, n * 4L, n * 4L);
         }
 
-        if (!P.On) return;
         int ch = P.Strip * 2; // hardware strips are stereo: L, R
         if (ch + 1 >= outs) return;
-        _l.Run((float*)b->Write[ch], n, P);
-        _r.Run((float*)b->Write[ch + 1], n, P);
+        if (P.On)
+        {
+            _l.Run((float*)b->Write[ch], n, P);
+            _r.Run((float*)b->Write[ch + 1], n, P);
+        }
+
+        // soundboard: after the effects, so the sound itself isn't turned into a demon
+        var clip = Clip;
+        if (clip == null) return;
+        int aux = P.AuxChannel;
+        float* ml = (float*)b->Write[ch], mr = (float*)b->Write[ch + 1];
+        float* al = aux >= 0 && aux + 1 < outs ? (float*)b->Write[aux] : null;
+        float* ar = aux >= 0 && aux + 1 < outs ? (float*)b->Write[aux + 1] : null;
+        float vf = clip.ToFriends, vm = clip.ToMe;
+        var d = clip.Data;
+        int frames = clip.Frames, pos = clip.Pos;
+        bool stop = clip.Stop;
+        for (int i = 0; i < n && pos < frames; i++, pos++)
+        {
+            float fade = stop ? 1f - (float)i / n : 1f; // stopping fades out over one block instead of clicking
+            float l = d[pos * 2] * fade, r = d[pos * 2 + 1] * fade;
+            ml[i] += l * vf;
+            mr[i] += r * vf;
+            if (al != null) { al[i] += l * vm; ar[i] += r * vm; }
+        }
+        clip.Pos = pos;
+        if (stop || pos >= frames) Clip = null;
     }
 
     // ───────────────────────── DSP, one instance per channel ─────────────────────────

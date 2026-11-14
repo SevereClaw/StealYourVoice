@@ -30,6 +30,7 @@ public partial class MainWindow
     private bool _fxApplying;
     private const int FxHotkeyId = 0x535A;
     private bool _captureFx;
+    private int _captureSlot = -1; // soundboard slot being given a key; -2 = the stop key
 
     private void InitVoiceFx()
     {
@@ -111,6 +112,7 @@ public partial class MainWindow
         _fx.P.Cave = _settings.FxCave;
         _fx.P.Strip = _strip;
         _fx.P.On = _settings.FxOn;
+        _fx.P.AuxChannel = _vm.IsConnected && _vm.Type != Voicemeeter.VmType.Standard ? _vm.HardwareStrips * 2 + 8 : -1;
     }
 
     private void SetFx(bool on, bool banner)
@@ -127,12 +129,13 @@ public partial class MainWindow
     /// <summary>Keep the insert registered only while the effect is on — no processing at all otherwise.</summary>
     private void SyncFxEngine()
     {
-        if (_settings.FxOn && _vm.IsConnected)
+        if ((_settings.FxOn || _fx.ClipPlaying) && _vm.IsConnected)
         {
             if (!_fx.Start())
             {
                 _settings.FxOn = false;
                 FxOnT.IsChecked = false;
+                _fx.Clip = null;
                 StatusText.Text = _fx.LastError.ToUpperInvariant();
             }
         }

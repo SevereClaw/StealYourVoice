@@ -28,6 +28,14 @@ public sealed class UserPreset
     public string? Process { get; set; }
 }
 
+public sealed class SoundSlot
+{
+    public string Name { get; set; } = "";
+    public string Path { get; set; } = "";
+    public int HotkeyVk { get; set; }
+    public int HotkeyMods { get; set; }
+}
+
 public sealed class Settings
 {
     public int Strip { get; set; }
@@ -65,6 +73,13 @@ public sealed class Settings
     public float FxEcho { get; set; }
     public float FxCave { get; set; } = 0.3f;
     public int FxHotkeyVk { get; set; }
+
+    // soundboard
+    public List<SoundSlot> Sounds { get; set; } = new();
+    public float SoundToFriends { get; set; } = 0.8f;
+    public float SoundToMe { get; set; } = 0.6f;
+    public int SoundStopVk { get; set; }
+    public int SoundStopMods { get; set; }
     public int FxHotkeyMods { get; set; }
 
     /// <summary>

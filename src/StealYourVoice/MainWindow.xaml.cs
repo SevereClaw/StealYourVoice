@@ -90,6 +90,7 @@ public partial class MainWindow : Window
         InitFx();
         InitExtras();
         InitVoiceFx();
+        InitBoard();
         InitDiscord();
 
         // presets
@@ -156,6 +157,7 @@ public partial class MainWindow : Window
         HwndSource.FromHwnd(_hwnd)?.AddHook(WndProc);
         RegisterMuteHotkey();
         RegisterFxHotkey();
+        RegisterSoundHotkeys();
     }
 
     // ───────────────────────── polling ─────────────────────────
@@ -175,6 +177,7 @@ public partial class MainWindow : Window
         if (_tick % 3 == 0) FollowVoiceTick();
         if (_tick % 3 == 1) TwoMicTick();
         if (_tick % 60 == 15) AppsTick();
+        if (_tick % 30 == 7) BoardTick();
         if (_tick % 150 == 0) SyncVolumeKeys();
 
         if (!_vm.IsConnected)
@@ -549,6 +552,7 @@ public partial class MainWindow : Window
     {
         _capturingHotkey = true;
         _captureFx = fx;
+        _captureSlot = -1;
         if (_hwnd != IntPtr.Zero) UnregisterHotKey(_hwnd, fx ? FxHotkeyId : HotkeyId);
         (fx ? FxHotkeyBtn : HotkeyBtn).Text = "НАЖМИ КЛАВИШУ...  (ESC — ОТМЕНА, BACKSPACE — УБРАТЬ)";
         Activate();
@@ -572,11 +576,15 @@ public partial class MainWindow : Window
                 return; // wait for the real key
             case Key.Escape:
                 _capturingHotkey = false;
+                _captureSlot = -1;
                 RegisterMuteHotkey();
                 RegisterFxHotkey();
+                RegisterSoundHotkeys();
+                BuildBoard();
                 return;
             case Key.Back:
                 _capturingHotkey = false;
+                if (FinishSlotCapture(0, 0)) return;
                 if (_captureFx) { _settings.FxHotkeyVk = 0; _settings.FxHotkeyMods = 0; }
                 else { _settings.HotkeyVk = 0; _settings.HotkeyMods = 0; }
                 _settings.Save();
@@ -595,12 +603,15 @@ public partial class MainWindow : Window
         if (!IsAllowedHotkey(key, mods))
         {
             // stay in capture mode and explain
-            (_captureFx ? FxHotkeyBtn : HotkeyBtn).Text = $"{key.ToString().ToUpperInvariant()} НЕЛЬЗЯ БЕЗ CTRL/ALT/SHIFT — ДРУГУЮ?";
+            var msg = $"{key.ToString().ToUpperInvariant()} НЕЛЬЗЯ БЕЗ CTRL/ALT/SHIFT — ДРУГУЮ?";
+            if (_captureSlot != -1) StatusText.Text = msg;
+            else (_captureFx ? FxHotkeyBtn : HotkeyBtn).Text = msg;
             Audio.Sfx.Play("cancel");
             return;
         }
 
         _capturingHotkey = false;
+        if (FinishSlotCapture(KeyInterop.VirtualKeyFromKey(key), mods)) return;
         if (_captureFx)
         {
             _settings.FxHotkeyVk = KeyInterop.VirtualKeyFromKey(key);
@@ -641,6 +652,7 @@ public partial class MainWindow : Window
             SetFx(!_settings.FxOn, true);
             handled = true;
         }
+        else if (msg == WM_HOTKEY && OnSoundHotkey(wParam.ToInt32())) handled = true;
         else if (msg == WM_HOTKEY && OnVolumeKey(wParam.ToInt32())) handled = true;
         return IntPtr.Zero;
     }
