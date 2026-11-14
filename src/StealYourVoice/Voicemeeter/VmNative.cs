@@ -108,6 +108,27 @@ internal static class VmNative
     [DllImport(Dll, EntryPoint = "VBVMR_Input_GetDeviceDescA", CallingConvention = CallingConvention.StdCall, CharSet = CharSet.Ansi)]
     public static extern int InputGetDeviceDescA(int index, out int type, StringBuilder name, StringBuilder hardwareId);
 
+    // ── audio callback: our own processing inserted into Voicemeeter's input strips ──
+
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    public delegate int AudioCallback(IntPtr user, int command, IntPtr data, int nnn);
+
+    public const int CbStarting = 1, CbEnding = 2, CbChange = 3, CbBufferIn = 10;
+    public const int ModeInputInsert = 1;
+
+    /// <returns>0 ok, 1 another application already holds the callback (its name is written back), &lt;0 error</returns>
+    [DllImport(Dll, EntryPoint = "VBVMR_AudioCallbackRegister", CallingConvention = CallingConvention.StdCall)]
+    public static extern int AudioCallbackRegister(int mode, AudioCallback callback, IntPtr user, byte[] clientName64);
+
+    [DllImport(Dll, EntryPoint = "VBVMR_AudioCallbackStart", CallingConvention = CallingConvention.StdCall)]
+    public static extern int AudioCallbackStart();
+
+    [DllImport(Dll, EntryPoint = "VBVMR_AudioCallbackStop", CallingConvention = CallingConvention.StdCall)]
+    public static extern int AudioCallbackStop();
+
+    [DllImport(Dll, EntryPoint = "VBVMR_AudioCallbackUnregister", CallingConvention = CallingConvention.StdCall)]
+    public static extern int AudioCallbackUnregister();
+
     [DllImport(Dll, EntryPoint = "VBVMR_Output_GetDeviceNumber", CallingConvention = CallingConvention.StdCall)]
     public static extern int OutputGetDeviceNumber();
 

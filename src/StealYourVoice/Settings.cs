@@ -56,6 +56,17 @@ public sealed class Settings
     /// <summary>Warn when two microphones are heard in Discord / the recording at the same time.</summary>
     public bool TwoMicWarn { get; set; } = true;
 
+    // voice changer
+    public bool FxOn { get; set; }
+    public string FxVoice { get; set; } = "ДЕМОН";
+    public float FxPitch { get; set; } = -7;
+    public float FxRobot { get; set; }
+    public float FxRadio { get; set; } = 0.15f;
+    public float FxEcho { get; set; }
+    public float FxCave { get; set; } = 0.3f;
+    public int FxHotkeyVk { get; set; }
+    public int FxHotkeyMods { get; set; }
+
     /// <summary>
     /// A virtual bus (B2 on Banana, B3 on Potato) carries only Discord, so CyberCall can subtitle friends
     /// while recorders never see that bus.

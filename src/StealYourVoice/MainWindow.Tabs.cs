@@ -16,8 +16,8 @@ public partial class MainWindow
 
     private void InitTabs()
     {
-        _tabs = new[] { TabVoice, TabSound, TabDiscord, TabSettings };
-        _pages = new FrameworkElement[] { PageVoice, PageSound, PageDiscord, PageSettings };
+        _tabs = new[] { TabVoice, TabFx, TabSound, TabDiscord, TabSettings };
+        _pages = new FrameworkElement[] { PageVoice, PageFx, PageSound, PageDiscord, PageSettings };
         for (int i = 0; i < _tabs.Length; i++)
         {
             int idx = i;
@@ -32,7 +32,7 @@ public partial class MainWindow
             int n = e.Key switch
             {
                 System.Windows.Input.Key.D1 => 0, System.Windows.Input.Key.D2 => 1,
-                System.Windows.Input.Key.D3 => 2, System.Windows.Input.Key.D4 => 3,
+                System.Windows.Input.Key.D3 => 2, System.Windows.Input.Key.D4 => 3, System.Windows.Input.Key.D5 => 4,
                 System.Windows.Input.Key.Tab => (_settings.Tab + 1) % _tabs.Length,
                 _ => -1
             };
@@ -84,7 +84,7 @@ public partial class MainWindow
             // Hidden, not Collapsed: the window keeps the height of the tallest page and doesn't jump
             _pages[i].Visibility = i == idx ? Visibility.Visible : Visibility.Hidden;
         }
-        if (idx == 1) AppsTick(); // fill the program list right away
+        if (_pages[idx] == PageSound) AppsTick(); // fill the program list right away
         if (!animate || !changed) return;
 
         Audio.Sfx.Play("tab");

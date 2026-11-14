@@ -76,6 +76,7 @@
             <!-- Tabs -->
             <WrapPanel x:Name="TabBar" Grid.Row="2" Margin="2,4,0,10">
                 <c:SlashToggle x:Name="TabVoice" Text="ГОЛОС" Sound="" FontSize="16" Height="38" Tilt="-1.5" Hint="Микрофон, пресеты, запись" />
+                <c:SlashToggle x:Name="TabFx" Text="ЭФФЕКТЫ" Sound="" FontSize="16" Height="38" Tilt="-1" Hint="Изменение голоса: демон, робот, рация, эхо…" />
                 <c:SlashToggle x:Name="TabSound" Text="ЗВУК" Sound="" FontSize="16" Height="38" Tilt="1" Hint="Громкость игры и наушников, автоприглушение" />
                 <c:SlashToggle x:Name="TabDiscord" Text="DISCORD" Sound="" FontSize="16" Height="38" Tilt="-0.5" Hint="Друзья, их громкость, список поверх игры" />
                 <c:SlashToggle x:Name="TabSettings" Text="НАСТРОЙКИ" Sound="" FontSize="16" Height="38" Tilt="1.5" Hint="Клавиши, индикатор, автозапуск, обновления" />
@@ -171,6 +172,58 @@
                         </StackPanel>
                     </Border></Grid>
                 </Grid></Grid>
+                <Grid x:Name="PageFx" Visibility="Hidden">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.15*" />
+                            <ColumnDefinition Width="26" />
+                            <ColumnDefinition Width="1*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Style="{StaticResource Card}">
+                            <Border.RenderTransform>
+                                <RotateTransform Angle="-0.8" />
+                            </Border.RenderTransform>
+                            <StackPanel>
+                                <DockPanel>
+                                    <TextBlock x:Name="FxState" DockPanel.Dock="Right" Text="ВЫКЛЮЧЕНО" Foreground="#808080"
+                                               FontFamily="Arial Black" FontSize="12" VerticalAlignment="Bottom" Margin="0,0,4,6" />
+                                    <TextBlock Style="{StaticResource Header}" Text="ГОЛОСА" />
+                                </DockPanel>
+                                <TextBlock Text="Голос меняется прямо в Voicemeeter: его слышат Discord, игры и запись" Foreground="#9A9A9A" FontSize="12" Margin="2,0,0,10" />
+                                <WrapPanel>
+                                    <c:SlashToggle x:Name="FxOnT" Text="ЭФФЕКТ ВКЛ" FontSize="15" Height="40" Tilt="-1.5" Sound=""
+                                                   Hint="Включить / выключить изменение голоса" />
+                                    <c:SlashToggle x:Name="FxListenT" Text="СЛЫШАТЬ СЕБЯ" FontSize="13" Height="40" Tilt="1"
+                                                   Hint="Слышать свой изменённый голос в наушниках (шина A1)" />
+                                </WrapPanel>
+                                <TextBlock Style="{StaticResource SubHeader}" Text="ВЫБЕРИ ГОЛОС" Margin="0,10,0,6" />
+                                <WrapPanel x:Name="FxVoicePanel" />
+                                <c:SlashToggle x:Name="FxHotkeyBtn" IsToggle="False" Text="ЭФФЕКТ НА КЛАВИШЕ: НЕТ" FontSize="12" Height="32"
+                                               HorizontalAlignment="Left" Margin="0,10,8,0"
+                                               Hint="Глобальная клавиша вкл/выкл эффекта. Нажми и введи комбинацию. Backspace — убрать, Esc — отмена" />
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="2" Style="{StaticResource Card}">
+                            <Border.RenderTransform>
+                                <RotateTransform Angle="1" />
+                            </Border.RenderTransform>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource Header}" Text="НАСТРОЙКА" FontSize="28" />
+                                <TextBlock Text="Подкрути выбранный голос — он станет «СВОЙ»" Foreground="#9A9A9A" FontSize="12" Margin="2,0,0,10" />
+                                <c:SlashSlider x:Name="FxPitchS" Label="ВЫСОТА" Minimum="-12" Maximum="12" Default="0" Step="1" Unit=" пт" Decimals="0"
+                                               Bipolar="True" Hint="Ниже — демон и великан, выше — бурундук. В полутонах" />
+                                <c:SlashSlider x:Name="FxRobotS" Label="РОБОТ" Minimum="0" Maximum="100" Default="0" Step="5" Unit="%" Decimals="0" Margin="0,10,0,0"
+                                               Hint="Металлический голос робота" />
+                                <c:SlashSlider x:Name="FxRadioS" Label="РАЦИЯ / МЕГАФОН" Minimum="0" Maximum="100" Default="0" Step="5" Unit="%" Decimals="0" Margin="0,10,0,0"
+                                               Hint="Узкая полоса частот и хрип, как из рации или громкоговорителя" />
+                                <c:SlashSlider x:Name="FxEchoS" Label="ЭХО" Minimum="0" Maximum="100" Default="0" Step="5" Unit="%" Decimals="0" Margin="0,10,0,0"
+                                               Hint="Повторы голоса" />
+                                <c:SlashSlider x:Name="FxCaveS" Label="ПЕЩЕРА" Minimum="0" Maximum="100" Default="0" Step="5" Unit="%" Decimals="0" Margin="0,10,0,0"
+                                               Hint="Гулкое помещение (реверберация)" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Grid>
                 <Grid x:Name="PageSound" Visibility="Hidden"><Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="1*" />

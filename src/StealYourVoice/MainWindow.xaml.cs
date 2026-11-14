@@ -89,6 +89,7 @@ public partial class MainWindow : Window
         InitTabs();
         InitFx();
         InitExtras();
+        InitVoiceFx();
         InitDiscord();
 
         // presets
@@ -154,6 +155,7 @@ public partial class MainWindow : Window
         _hwnd = new WindowInteropHelper(this).EnsureHandle();
         HwndSource.FromHwnd(_hwnd)?.AddHook(WndProc);
         RegisterMuteHotkey();
+        RegisterFxHotkey();
     }
 
     // ───────────────────────── polling ─────────────────────────
@@ -209,6 +211,9 @@ public partial class MainWindow : Window
     {
         if (_strip >= _vm.HardwareStrips) _strip = 0;
         Audio.Ducker.RestoreAfterCrash(_vm);
+        _fx.Stop(); // a fresh Voicemeeter session needs a fresh registration
+        SyncFxEngine();
+        PushFxParams();
         SyncVolumeKeys();
         BuildStripButtons();
         RefreshParams();
@@ -297,6 +302,7 @@ public partial class MainWindow : Window
     {
         _strip = idx;
         SaveStrip();
+        _fx.P.Strip = idx;
         Wipe.Play();
         Audio.Sfx.Play("whoosh");
         foreach (var t in StripPanel.Children.OfType<SlashToggle>()) t.IsChecked = false;
@@ -537,11 +543,14 @@ public partial class MainWindow : Window
         return string.Join("+", parts);
     }
 
-    private void StartHotkeyCapture()
+    private void StartHotkeyCapture() => StartHotkeyCapture(false);
+
+    private void StartHotkeyCapture(bool fx)
     {
         _capturingHotkey = true;
-        if (_hwnd != IntPtr.Zero) UnregisterHotKey(_hwnd, HotkeyId);
-        HotkeyBtn.Text = "НАЖМИ КЛАВИШУ...  (ESC — ОТМЕНА, BACKSPACE — УБРАТЬ)";
+        _captureFx = fx;
+        if (_hwnd != IntPtr.Zero) UnregisterHotKey(_hwnd, fx ? FxHotkeyId : HotkeyId);
+        (fx ? FxHotkeyBtn : HotkeyBtn).Text = "НАЖМИ КЛАВИШУ...  (ESC — ОТМЕНА, BACKSPACE — УБРАТЬ)";
         Activate();
         Keyboard.Focus(this);
     }
@@ -564,13 +573,15 @@ public partial class MainWindow : Window
             case Key.Escape:
                 _capturingHotkey = false;
                 RegisterMuteHotkey();
+                RegisterFxHotkey();
                 return;
             case Key.Back:
                 _capturingHotkey = false;
-                _settings.HotkeyVk = 0;
-                _settings.HotkeyMods = 0;
+                if (_captureFx) { _settings.FxHotkeyVk = 0; _settings.FxHotkeyMods = 0; }
+                else { _settings.HotkeyVk = 0; _settings.HotkeyMods = 0; }
                 _settings.Save();
                 RegisterMuteHotkey();
+                RegisterFxHotkey();
                 return;
         }
 
@@ -584,16 +595,25 @@ public partial class MainWindow : Window
         if (!IsAllowedHotkey(key, mods))
         {
             // stay in capture mode and explain
-            HotkeyBtn.Text = $"{key.ToString().ToUpperInvariant()} НЕЛЬЗЯ БЕЗ CTRL/ALT/SHIFT — ДРУГУЮ?";
+            (_captureFx ? FxHotkeyBtn : HotkeyBtn).Text = $"{key.ToString().ToUpperInvariant()} НЕЛЬЗЯ БЕЗ CTRL/ALT/SHIFT — ДРУГУЮ?";
             Audio.Sfx.Play("cancel");
             return;
         }
 
         _capturingHotkey = false;
-        _settings.HotkeyVk = KeyInterop.VirtualKeyFromKey(key);
-        _settings.HotkeyMods = mods;
+        if (_captureFx)
+        {
+            _settings.FxHotkeyVk = KeyInterop.VirtualKeyFromKey(key);
+            _settings.FxHotkeyMods = mods;
+        }
+        else
+        {
+            _settings.HotkeyVk = KeyInterop.VirtualKeyFromKey(key);
+            _settings.HotkeyMods = mods;
+        }
         _settings.Save();
         RegisterMuteHotkey();
+        RegisterFxHotkey();
     }
 
     /// <summary>
@@ -614,6 +634,11 @@ public partial class MainWindow : Window
         if (msg == WM_HOTKEY && wParam.ToInt32() == HotkeyId)
         {
             ToggleMute();
+            handled = true;
+        }
+        else if (msg == WM_HOTKEY && wParam.ToInt32() == FxHotkeyId)
+        {
+            SetFx(!_settings.FxOn, true);
             handled = true;
         }
         else if (msg == WM_HOTKEY && OnVolumeKey(wParam.ToInt32())) handled = true;
@@ -1001,6 +1026,7 @@ public partial class MainWindow : Window
         _settings.Flush();
         _toast?.Close();
         _micWatcher?.Dispose();
+        _fx.Dispose();
         _audioWatch?.Dispose();
         _warnToast?.Close();
         ReleaseVolumeKeys();
