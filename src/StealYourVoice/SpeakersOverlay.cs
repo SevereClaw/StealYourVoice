@@ -14,7 +14,7 @@ namespace StealYourVoice;
 
 public record SpeakerInfo(string Id, string Name, string? Avatar, bool MicOff, bool Deaf, bool Live = false, bool Camera = false);
 
-public record SpeakerStyle(bool OnlyTalking, double SilentOpacity, double Scale, bool AvatarsOnly);
+public record SpeakerStyle(bool OnlyTalking, double SilentOpacity, double Scale, bool AvatarsOnly, bool Horizontal = false);
 
 /// <summary>
 /// Click-through list of the Discord voice channel, shown over the game:
@@ -46,6 +46,8 @@ public sealed class SpeakersOverlay : Window
     private static readonly FontFamily Font = new("Arial Black, Segoe UI, Segoe UI Symbol");
     private static readonly Thickness Rest = new(0, 2, 0, 2);
     private static readonly Thickness Spread = new(0, 10, 0, 10);
+    private static readonly Thickness RestH = new(3, 0, 3, 0);
+    private static readonly Thickness SpreadH = new(12, 0, 12, 0);
 
     private readonly StackPanel _stack = new() { Margin = new Thickness(8, 2, 8, 2) };
     private readonly ScaleTransform _scale = new(1, 1);
@@ -154,6 +156,13 @@ public sealed class SpeakersOverlay : Window
         }
         var a = SystemParameters.WorkArea;
         const double m = 10;
+        if (_corner is 5 or 6)
+        {
+            // a row centred along the top / bottom edge
+            Left = a.Left + (a.Width - ActualWidth) / 2;
+            Top = _corner == 5 ? a.Top + m + _offset : a.Bottom - ActualHeight - m - _offset;
+            return;
+        }
         Left = _corner is 1 or 3 ? a.Left + m : a.Right - ActualWidth - m;
         Top = _corner is 1 or 2 ? a.Top + m + _offset : a.Bottom - ActualHeight - m - _offset;
     }
@@ -171,6 +180,7 @@ public sealed class SpeakersOverlay : Window
         _offset = offset;
         _style = style;
         _scale.ScaleX = _scale.ScaleY = style.Scale;
+        _stack.Orientation = style.Horizontal ? Orientation.Horizontal : Orientation.Vertical;
 
         if (signature != _signature)
         {
@@ -189,9 +199,14 @@ public sealed class SpeakersOverlay : Window
             foreach (var m in members)
             {
                 var row = BuildRow(m, right, style);
+                if (style.Horizontal)
+                {
+                    row.Border.Margin = RestH;
+                    row.Border.VerticalAlignment = VerticalAlignment.Top;
+                }
                 _rows[m.Id] = row;
                 _stack.Children.Add(row.Border);
-                if (m.Id == _hover) ApplyHover(row, true, false);
+                if (m.Id == _hover) ApplyHover(row, true, false, style.Horizontal);
 
                 // someone new joined → their plate flies in from the screen edge
                 if (before.Count > 0 && !before.Contains(m.Id))
@@ -248,7 +263,7 @@ public sealed class SpeakersOverlay : Window
     {
         if (id == _hover) return;
         _hover = id;
-        foreach (var kv in _rows) ApplyHover(kv.Value, kv.Key == id, true);
+        foreach (var kv in _rows) ApplyHover(kv.Value, kv.Key == id, true, _style.Horizontal);
         SetSpeaking(_speaking);
         ApplyMuteButtons();
     }
@@ -321,9 +336,9 @@ public sealed class SpeakersOverlay : Window
         r.MutePop.BeginAnimation(ScaleTransform.ScaleYProperty, kick);
     }
 
-    private static void ApplyHover(Row row, bool on, bool animate)
+    private static void ApplyHover(Row row, bool on, bool animate, bool horizontal)
     {
-        var target = on ? Spread : Rest;
+        var target = horizontal ? (on ? SpreadH : RestH) : (on ? Spread : Rest);
         if (animate)
             row.Border.BeginAnimation(MarginProperty, new ThicknessAnimation(target, TimeSpan.FromMilliseconds(170))
                 { EasingFunction = new BackEase { Amplitude = 0.4, EasingMode = EasingMode.EaseOut } });

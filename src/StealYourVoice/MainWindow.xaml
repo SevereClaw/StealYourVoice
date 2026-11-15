@@ -528,6 +528,9 @@
 
                     <StackPanel x:Name="DcViewPanel">
                         <TextBlock Style="{StaticResource SubHeader}" Text="СПИСОК ПОВЕРХ ИГРЫ" Margin="0,8,0,6" />
+                        <TextBlock Text="РАССТАНОВКА" Foreground="#9A9A9A" FontFamily="Arial Black" FontSize="12" Margin="2,0,0,4" />
+                        <WrapPanel x:Name="SpkLayoutPanel" Margin="0,0,0,4" />
+                        <WrapPanel x:Name="SpkMyLayoutsPanel" Margin="0,0,0,6" />
                         <WrapPanel>
                             <c:SlashToggle x:Name="SpeakersBtn" Text="КТО ГОВОРИТ: ВЫКЛ" IsToggle="False" Height="32" FontSize="12"
                                            Hint="Поверх игры показывать людей из голосового канала с аватарками. Каждое нажатие — следующий угол экрана" />

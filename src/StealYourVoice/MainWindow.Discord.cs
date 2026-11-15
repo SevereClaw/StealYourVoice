@@ -141,6 +141,7 @@ public partial class MainWindow
         SpkSelfT.IsChecked = _settings.SpeakersShowSelf;
         SpkLoudT.IsChecked = _settings.SpeakersLoudness;
         SpkLoudT.Click += t => { _settings.SpeakersLoudness = t.IsChecked; _settings.Save(); UpdateSpeakers(); };
+        InitLayouts();
         SpkGatherBtn.Click += _ =>
         {
             _settings.SpeakerPositions.Clear();
@@ -930,19 +931,29 @@ public partial class MainWindow
                 f.MicOff, f.Deaf, f.Live, f.Cam));
         }
 
+        var layout = _settings.SpeakersLayout;
+        bool row = layout is "row-top" or "row-bottom";
         var style = new SpeakerStyle(_settings.SpeakersOnlyTalking, _settings.SpeakersSilentOpacity,
-            _settings.SpeakersScale, _settings.SpeakersAvatarsOnly);
+            _settings.SpeakersScale, _settings.SpeakersAvatarsOnly, row);
         var loud = _settings.SpeakersLoudness ? _dcLoud : NoLoudness;
 
         // people parked on their own get a little window each; the rest stay in the shared list
         var attached = new List<SpeakerInfo>();
         var parked = new HashSet<string>();
+        var free = members.Where(m => !_settings.SpeakerPositions.ContainsKey(m.Id)).ToList();
         foreach (var m in members)
         {
-            if (!_settings.SpeakerPositions.TryGetValue(m.Id, out var pos) || pos.Length != 2)
+            double[]? pos = null;
+            if (!_settings.SpeakerPositions.TryGetValue(m.Id, out pos) || pos.Length != 2)
             {
-                attached.Add(m);
-                continue;
+                // spread-out layouts give everyone their own spot; the others share one list
+                var spot = LayoutSpot(free.IndexOf(m), free.Count);
+                if (spot == null)
+                {
+                    attached.Add(m);
+                    continue;
+                }
+                pos = new[] { spot.Value.X, spot.Value.Y };
             }
             parked.Add(m.Id);
             if (!_detached.TryGetValue(m.Id, out var d)) _detached[m.Id] = d = new SpeakersOverlay();
@@ -963,9 +974,10 @@ public partial class MainWindow
         _speakers ??= new SpeakersOverlay();
         // same corner as the mic indicator → sit right next to it instead of on top
         bool shared = _settings.OverlayCorner == _settings.SpeakersCorner;
-        _speakers.SetMembers(attached, _settings.SpeakersCorner, shared ? 36 : 0, style,
-            _settings.SpeakersX.HasValue && _settings.SpeakersY.HasValue
-                ? new Point(_settings.SpeakersX.Value, _settings.SpeakersY.Value) : null);
+        int corner = layout switch { "row-top" => 5, "row-bottom" => 6, _ => _settings.SpeakersCorner };
+        bool custom = _settings.SpeakersX.HasValue && _settings.SpeakersY.HasValue;
+        _speakers.SetMembers(attached, corner, shared && !row ? 36 : 0, style,
+            custom ? new Point(_settings.SpeakersX!.Value, _settings.SpeakersY!.Value) : null);
         _speakers.SetSpeaking(_dcSpeaking);
         _speakers.SetLoudness(loud, _dcSpeaking);
         _speakers.SetLocalMutes(_dcLocalMute, _dcUserId);

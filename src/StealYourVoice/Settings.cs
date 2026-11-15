@@ -28,6 +28,17 @@ public sealed class UserPreset
     public string? Process { get; set; }
 }
 
+public sealed class SpeakerLayoutPreset
+{
+    public string Name { get; set; } = "";
+    public string Layout { get; set; } = "list";
+    public int Corner { get; set; } = 1;
+    public double? X { get; set; }
+    public double? Y { get; set; }
+    public double Scale { get; set; } = 1;
+    public Dictionary<string, double[]> Positions { get; set; } = new();
+}
+
 public sealed class SoundSlot
 {
     public string Name { get; set; } = "";
@@ -141,6 +152,12 @@ public sealed class Settings
 
     /// <summary>People pulled out of the list and parked on their own: user id → [x, y].</summary>
     public Dictionary<string, double[]> SpeakerPositions { get; set; } = new();
+
+    /// <summary>How people are laid out: list | row-top | row-bottom | edges | stairs.</summary>
+    public string SpeakersLayout { get; set; } = "list";
+
+    /// <summary>Your own saved arrangements.</summary>
+    public List<SpeakerLayoutPreset> SpeakerLayouts { get; set; } = new();
 
     private static readonly string Dir =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StealYourVoice");
