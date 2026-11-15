@@ -159,6 +159,9 @@ public sealed class Settings
     /// <summary>Your own saved arrangements.</summary>
     public List<SpeakerLayoutPreset> SpeakerLayouts { get; set; } = new();
 
+    /// <summary>People in the call (you included) → arrangement to switch to: a built-in key, or "my:" + saved name.</summary>
+    public Dictionary<int, string> LayoutByCount { get; set; } = new();
+
     private static readonly string Dir =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StealYourVoice");
     private static readonly string FilePath = Path.Combine(Dir, "settings.json");

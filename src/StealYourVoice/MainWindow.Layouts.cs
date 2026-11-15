@@ -29,10 +29,85 @@ public partial class MainWindow
             SpkLayoutPanel.Children.Add(b);
         }
         BuildMyLayouts();
+        BuildCountButtons();
         MarkLayout();
     }
 
-    private void ApplyLayout(string key)
+    // ───────────────────────── arrangement by the number of people ─────────────────────────
+
+    private int _lastPeopleCount = -1;
+
+    private string LayoutTitle(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return "—";
+        if (value.StartsWith("my:")) return "★ " + value[3..];
+        return Layouts.FirstOrDefault(l => l.Key == value).Text ?? "—";
+    }
+
+    private void BuildCountButtons()
+    {
+        SpkCountPanel.Children.Clear();
+        for (int n = 2; n <= 10; n++)
+        {
+            int count = n;
+            _settings.LayoutByCount.TryGetValue(n, out var v);
+            var title = LayoutTitle(v);
+            if (title.Length > 14) title = title[..13] + "…";
+            var b = new SlashToggle
+            {
+                Text = $"{n}: {title}", IsToggle = false, Height = 30, FontSize = 11, Sound = "",
+                Hint = $"Какая расстановка включается, когда в звонке {n} человек (с тобой)"
+            };
+            b.IsChecked = false;
+            b.Click += _ => ShowCountMenu(b, count);
+            SpkCountPanel.Children.Add(b);
+        }
+    }
+
+    private void ShowCountMenu(FrameworkElement target, int count)
+    {
+        var menu = new ContextMenu { PlacementTarget = target, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
+        void Add(string header, string? value)
+        {
+            var mi = new MenuItem { Header = header };
+            mi.Click += (_, _) =>
+            {
+                if (value == null) _settings.LayoutByCount.Remove(count);
+                else _settings.LayoutByCount[count] = value;
+                _settings.Save();
+                BuildCountButtons();
+                _lastPeopleCount = -1; // re-check right away
+                CheckPeopleCount(_dcCurrent.Count + (_dcSelfInChannel ? 1 : 0));
+            };
+            menu.Items.Add(mi);
+        }
+        Add("Не менять", null);
+        menu.Items.Add(new Separator());
+        foreach (var l in Layouts) Add(l.Text, l.Key);
+        if (_settings.SpeakerLayouts.Count > 0) menu.Items.Add(new Separator());
+        foreach (var p in _settings.SpeakerLayouts) Add("★ " + p.Name, "my:" + p.Name);
+        menu.IsOpen = true;
+    }
+
+    /// <summary>Called whenever the people list is refreshed: on a new head count, switch arrangements.</summary>
+    private void CheckPeopleCount(int count)
+    {
+        if (count == _lastPeopleCount) return;
+        _lastPeopleCount = count;
+        if (count < 2 || !_settings.LayoutByCount.TryGetValue(Math.Min(count, 10), out var v)) return;
+
+        if (v.StartsWith("my:"))
+        {
+            var p = _settings.SpeakerLayouts.FirstOrDefault(x => x.Name == v[3..]);
+            if (p != null) ApplyMyLayout(p, quiet: true);
+        }
+        else if (v != _settings.SpeakersLayout || _settings.SpeakerPositions.Count > 0 || _settings.SpeakersX.HasValue)
+            ApplyLayout(v, quiet: true);
+    }
+
+    private void ApplyLayout(string key) => ApplyLayout(key, false);
+
+    private void ApplyLayout(string key, bool quiet)
     {
         _settings.SpeakersLayout = key;
         _settings.SpeakerPositions.Clear(); // a fresh arrangement starts from nobody pulled out
@@ -41,7 +116,7 @@ public partial class MainWindow
         _settings.Save();
         SpeakersBtn.Text = "КТО ГОВОРИТ: " + CornerNames[_settings.SpeakersCorner];
         MarkLayout();
-        Audio.Sfx.Play("tab");
+        if (!quiet) Audio.Sfx.Play("tab");
         UpdateSpeakers();
     }
 
@@ -65,7 +140,15 @@ public partial class MainWindow
             var over = new MenuItem { Header = "Перезаписать текущей расстановкой" };
             over.Click += (_, _) => { Fill(preset); _settings.Save(); };
             var del = new MenuItem { Header = "Удалить" };
-            del.Click += (_, _) => { _settings.SpeakerLayouts.Remove(preset); _settings.Save(); BuildMyLayouts(); };
+            del.Click += (_, _) =>
+            {
+                _settings.SpeakerLayouts.Remove(preset);
+                foreach (var k in _settings.LayoutByCount.Where(kv => kv.Value == "my:" + preset.Name).Select(kv => kv.Key).ToList())
+                    _settings.LayoutByCount.Remove(k);
+                _settings.Save();
+                BuildMyLayouts();
+                BuildCountButtons();
+            };
             menu.Items.Add(over);
             menu.Items.Add(del);
             b.ContextMenu = menu;
@@ -80,6 +163,7 @@ public partial class MainWindow
             _settings.SpeakerLayouts.Add(p);
             _settings.Save();
             BuildMyLayouts();
+            BuildCountButtons();
             StatusText.Text = $"СОХРАНЕНО: {p.Name}";
         };
         SpkMyLayoutsPanel.Children.Add(add);
@@ -95,7 +179,9 @@ public partial class MainWindow
         p.Positions = _settings.SpeakerPositions.ToDictionary(kv => kv.Key, kv => (double[])kv.Value.Clone());
     }
 
-    private void ApplyMyLayout(SpeakerLayoutPreset p)
+    private void ApplyMyLayout(SpeakerLayoutPreset p) => ApplyMyLayout(p, false);
+
+    private void ApplyMyLayout(SpeakerLayoutPreset p, bool quiet)
     {
         _settings.SpeakersLayout = p.Layout;
         _settings.SpeakersCorner = p.Corner;
@@ -107,7 +193,7 @@ public partial class MainWindow
         SpkScaleS.Value = Math.Round(p.Scale * 100);
         SpeakersBtn.Text = "КТО ГОВОРИТ: " + CornerNames[_settings.SpeakersCorner];
         MarkLayout();
-        Audio.Sfx.Play("tab");
+        if (!quiet) Audio.Sfx.Play("tab");
         UpdateSpeakers();
     }
 

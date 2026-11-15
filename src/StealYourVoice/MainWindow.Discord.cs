@@ -1046,6 +1046,7 @@ public partial class MainWindow
 
         // someone who left mid-word never sends SPEAKING_STOP
         _dcCurrent = friends.OrderBy(f => f.Name, StringComparer.CurrentCultureIgnoreCase).Select(f => f.Id).ToList();
+        CheckPeopleCount(friends.Count + (_dcSelfInChannel ? 1 : 0));
         _dcSpeaking.IntersectWith(friends.Select(f => f.Id).Append(_dcUserId ?? ""));
         UpdateSpeakers();
     }
