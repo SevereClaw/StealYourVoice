@@ -470,6 +470,7 @@ public partial class MainWindow
         if (evt == "SPEAKING_START") _dcSpeaking.Add(id);
         else if (evt == "SPEAKING_STOP") _dcSpeaking.Remove(id);
         else return;
+        VoiceLogTick();   // время фразы — точно в момент события, а не на следующем кадре таймера
         if (_dcRows.TryGetValue(id, out var row)) row.Dot.Background = _dcSpeaking.Contains(id) ? P5.Red : P5.Coal;
         UpdateSpeakers();
     }
