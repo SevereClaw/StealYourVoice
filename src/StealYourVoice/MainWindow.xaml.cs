@@ -175,6 +175,7 @@ public partial class MainWindow : Window
         if (Math.Abs(_timer.Interval.TotalMilliseconds - wantMs) > 1) _timer.Interval = TimeSpan.FromMilliseconds(wantMs);
 
         DiscordTick();
+        VoiceLogTick();   // кто говорит в Discord — для меток в клипах MidnightClips
         if (_tick % 60 == 30) CheckMicPlugged();
         if (_tick % 3 == 0) FollowVoiceTick();
         if (_tick % 3 == 1) TwoMicTick();
