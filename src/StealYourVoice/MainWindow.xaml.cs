@@ -89,6 +89,7 @@ public partial class MainWindow : Window
         InitTabs();
         InitFx();
         InitExtras();
+        InitMidnight();
         InitVoiceFx();
         InitBoard();
         InitDiscord();
@@ -208,6 +209,7 @@ public partial class MainWindow : Window
         ToolTick();
         ExtrasTick();
         DuckTick();
+        if (_tick % 60 == 41) MidnightTick();
     }
 
     private void OnConnected()
@@ -220,6 +222,7 @@ public partial class MainWindow : Window
         SyncVolumeKeys();
         BuildStripButtons();
         RefreshParams();
+        if (_settings.MidnightClips == true) ApplyMidnight(false);   // Voicemeeter мог запуститься со старой раскладкой
         Offline.Visibility = Visibility.Collapsed;
         StatusText.Text = $"VOICEMEETER {_vm.Type.ToString().ToUpperInvariant()} // НА СВЯЗИ";
     }
@@ -259,6 +262,7 @@ public partial class MainWindow : Window
         HeadBtn.Text = "НАУШНИКИ (A1): " + (string.IsNullOrWhiteSpace(head) ? "НЕ ВЫБРАНЫ ⚠" : head.ToUpperInvariant());
 
         RefreshExtras();
+        RefreshMidnightUi();
         CheckMicChanged();
         RefreshRoutedStrips();
         UpdateTrayMute();

@@ -334,6 +334,8 @@
                                            Hint="Выбрать программы, которые не приглушаются (например, музыка). Пока выбрана хоть одна, глушится каждая программа отдельно через микшер Windows, а не весь вход Voicemeeter" />
                             <c:SlashToggle x:Name="GameToB2T" Text="ИГРА → КЛИПЫ (B2)" FontSize="13" Height="32"
                                            Hint="Звук компьютера (уже приглушённый) + твой голос уходят в шину B2 — только для ShadowPlay. В Discord (B1) остаётся только голос. В ShadowPlay: микрофон = Voicemeeter Out B2, «Системные звуки» = 0%" />
+                            <c:SlashToggle x:Name="MidnightT" Text="MIDNIGHT CLIPS" FontSize="13" Height="32" Tilt="1" Visibility="Collapsed"
+                                           Hint="На шине, которую MidnightClips берёт микрофоном, — только твой голос. Музыку, игру и Discord MidnightClips пишет сам, каждое на свою дорожку" />
                         </WrapPanel>
                         <Grid Margin="0,4,0,0">
                             <Grid.ColumnDefinitions>

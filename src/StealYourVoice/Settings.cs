@@ -105,6 +105,12 @@ public sealed class Settings
     /// </summary>
     public bool StreamsNoVoices { get; set; }
 
+    /// <summary>
+    /// MidnightClips takes the mic from a Voicemeeter bus and records programs by itself: keep only your voice
+    /// on that bus. null = not decided yet (switched on automatically once MidnightClips is found listening to a bus).
+    /// </summary>
+    public bool? MidnightClips { get; set; }
+
     /// <summary>Keyboard volume keys drive the Voicemeeter headphones bus (A1) while Voicemeeter is the default device.</summary>
     public bool VolumeKeys { get; set; } = true;
 
