@@ -212,13 +212,20 @@ public partial class MainWindow
         var a = SystemParameters.WorkArea;
         double k = _settings.SpeakersScale;
         double plate = (_settings.SpeakersAvatarsOnly ? 64 : 230) * k, step = 54 * k, gap = 10;
+        double leftX = a.Left + 12, rightX = a.Right - plate - 12;
         switch (zone)
         {
+            case "tl":                                   // corners: the column grows away from the corner
+            case "tr":
+                return new Point(zone == "tl" ? leftX : rightX, a.Top + 12 + index * step);
+            case "bl":
+            case "br":
+                return new Point(zone == "bl" ? leftX : rightX, a.Bottom - 12 - (count - index) * step);
             case "left":
             case "right":
             {
                 double top = a.Top + Math.Max(12, (a.Height - count * step) / 2);
-                return new Point(zone == "left" ? a.Left + 12 : a.Right - plate - 12, top + index * step);
+                return new Point(zone == "left" ? leftX : rightX, top + index * step);
             }
             default:
             {
@@ -228,6 +235,15 @@ public partial class MainWindow
                 return new Point(left + index * (plate + gap), y);
             }
         }
+    }
+
+    /// <summary>How many people already stand in each zone (for the slots drawn in the zones).</summary>
+    private Dictionary<string, int> DockCounts(ICollection<string> present, string? except)
+    {
+        var counts = new Dictionary<string, int>();
+        foreach (var (key, _) in DockZones.Zones)
+            counts[key] = DockMembers(key, present).Count(id => id != except);
+        return counts;
     }
 
     /// <summary>People present in a zone, in their docking order.</summary>
@@ -245,7 +261,7 @@ public partial class MainWindow
         _settings.SpeakerPositions.Remove(id);
         _settings.SpeakerDocks[id] = zone;
         var others = DockMembers(zone, present).Where(x => x != id).ToList();
-        bool column = zone is "left" or "right";
+        bool column = DockZones.IsColumn(zone);
         int at = others.Count;
         for (int i = 0; i < others.Count; i++)
         {

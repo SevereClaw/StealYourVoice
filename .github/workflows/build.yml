@@ -30,6 +30,17 @@ jobs:
           -p:DebugType=none
           -o out
 
+      - name: Drop zones picture (build check)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath out/StealYourVoice.exe -ArgumentList '--render-zones', "$PWD/zones.png" -PassThru -Wait
+          if (Test-Path zones.png) {
+            $b = [Convert]::ToBase64String([IO.File]::ReadAllBytes("zones.png"))
+            for ($i = 0; $i -lt $b.Length; $i += 20000) { "ZONES_PART $([int]($i / 20000)) " + $b.Substring($i, [Math]::Min(20000, $b.Length - $i)) }
+          }
+          if (Test-Path zones.png.err) { Get-Content zones.png.err }
+
       - name: Read version
         id: ver
         shell: pwsh

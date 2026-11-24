@@ -619,7 +619,9 @@ public partial class MainWindow
                     if (_dockZones == null || !_dockZones.IsVisible)
                     {
                         _dockZones ??= new DockZones();
-                        _dockZones.ShowZones();
+                        var here = new HashSet<string>(_dcCurrent);
+                        if (_dcUserId != null) here.Add(_dcUserId);
+                        _dockZones.ShowZones(DockCounts(here, _dragPerson));
                         d.Topmost = false; // the dragged plate stays above the zones
                         d.Topmost = true;
                     }

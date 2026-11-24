@@ -12,6 +12,21 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // build check: draw the drop zones into a picture and quit
+        int ri = Array.IndexOf(e.Args, "--render-zones");
+        if (ri >= 0 && ri + 1 < e.Args.Length)
+        {
+            try
+            {
+                var counts = new System.Collections.Generic.Dictionary<string, int>
+                    { ["tl"] = 2, ["br"] = 1, ["top"] = 3, ["left"] = 0 };
+                DockZones.RenderPreview(e.Args[ri + 1], 1920, 1040, "bl", counts);
+            }
+            catch (Exception ex) { System.IO.File.WriteAllText(e.Args[ri + 1] + ".err", ex.ToString()); }
+            Shutdown();
+            return;
+        }
+
         bool updated = Array.IndexOf(e.Args, "--updated") >= 0;
 
         _single = new Mutex(true, "StealYourVoice.SingleInstance", out bool created);
