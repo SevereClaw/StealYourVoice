@@ -90,6 +90,7 @@ public partial class MainWindow : Window
         InitFx();
         InitExtras();
         InitMidnight();
+        InitLink();
         InitVoiceFx();
         InitBoard();
         InitDiscord();
@@ -386,12 +387,9 @@ public partial class MainWindow : Window
     {
         PresetPanel.Children.Clear();
 
-        AddPresetButton("ЧИСТЫЙ", "Шумодав 3, компрессор 4, моно", -1.5,
-            () => { _vm.Script($"{S("Gate")}=3;{S("Comp")}=4;{S("Mono")}=1;"); ShowPresetBanner("ПРЕСЕТ ВКЛЮЧЁН", "ЧИСТЫЙ"); });
-        AddPresetButton("СТРИМ", "Шумодав 4.5, компрессор 6.5, моно — ровный голос поверх игры", 1,
-            () => { _vm.Script($"{S("Gate")}=4.5;{S("Comp")}=6.5;{S("Mono")}=1;"); ShowPresetBanner("ПРЕСЕТ ВКЛЮЧЁН", "СТРИМ"); });
-        AddPresetButton("СЫРОЙ", "Без обработки", -0.5,
-            () => { _vm.Script($"{S("Gate")}=0;{S("Comp")}=0;"); ShowPresetBanner("ПРЕСЕТ ВКЛЮЧЁН", "СЫРОЙ"); });
+        AddPresetButton("ЧИСТЫЙ", "Шумодав 3, компрессор 4, моно", -1.5, () => ApplyBuiltinPreset("ЧИСТЫЙ"));
+        AddPresetButton("СТРИМ", "Шумодав 4.5, компрессор 6.5, моно — ровный голос поверх игры", 1, () => ApplyBuiltinPreset("СТРИМ"));
+        AddPresetButton("СЫРОЙ", "Без обработки", -0.5, () => ApplyBuiltinPreset("СЫРОЙ"));
 
         var rnd = new Random(42);
         foreach (var p in _settings.Presets)
@@ -511,6 +509,7 @@ public partial class MainWindow : Window
         {
             p.LastUsed = DateTime.Now;
             _settings.Save();
+            _activePreset = p.Name;
         }
         // unnamed = the snapshot we restore when the bound programs close; that one announces itself separately
         if (!string.IsNullOrEmpty(p.Name)) ShowPresetBanner(reason ?? "ПРЕСЕТ ВКЛЮЧЁН", p.Name.ToUpperInvariant());
@@ -1044,6 +1043,7 @@ public partial class MainWindow : Window
         _toast?.Close();
         _micWatcher?.Dispose();
         _fx.Dispose();
+        _link?.Dispose();
         _audioWatch?.Dispose();
         _warnToast?.Close();
         ReleaseVolumeKeys();
