@@ -16,10 +16,10 @@ public sealed class DockZones : Window
 {
     public static readonly (string Key, string Text)[] Zones =
     {
-        ("tl", "УГОЛ ↖"),
-        ("tr", "УГОЛ ↗"),
-        ("bl", "УГОЛ ↙"),
-        ("br", "УГОЛ ↘"),
+        ("tl", "ЛЕВЫЙ ВЕРХ"),
+        ("tr", "ПРАВЫЙ ВЕРХ"),
+        ("bl", "ЛЕВЫЙ НИЗ"),
+        ("br", "ПРАВЫЙ НИЗ"),
         ("left", "СЛЕВА"),
         ("right", "СПРАВА"),
         ("top", "РЯД СВЕРХУ"),
