@@ -364,7 +364,25 @@ public partial class MainWindow
     }
 
     private static string PresetTitle(UserPreset p) =>
-        "★ " + p.Name.ToUpperInvariant() + (string.IsNullOrEmpty(p.Process) ? "" : $" [{p.Process.ToUpperInvariant()}]");
+        "★ " + p.Name.ToUpperInvariant() + (string.IsNullOrEmpty(p.Process) ? "" : $" [{Short(GameName(p.Process), 14)}]");
+
+    /// <summary>Human name of a game from its process: Unreal builds are called «HEADLINERS-Win64-Shipping»,
+    /// Unity/others «Game_x64», «GameDX12» — the tail is just the build type, not the name.</summary>
+    internal static string GameName(string process)
+    {
+        var n = process.Trim();
+        for (int i = 0; i < 3; i++)   // хвосты бывают составными: -Win64-Shipping, _x64_Release…
+        {
+            var cut = System.Text.RegularExpressions.Regex.Replace(n,
+                @"[-_. ]*(win64|win32|wingdk|wingame|windows|shipping|development|test|release|retail|x64|x86|64bit|32bit|dx11|dx12|d3d11|d3d12|vulkan|vk|launcher|client)$",
+                "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (cut == n || cut.Length == 0) break;
+            n = cut;
+        }
+        return (n.Length == 0 ? process : n).ToUpperInvariant();
+    }
+
+    private static string Short(string text, int max) => text.Length > max ? text[..(max - 1)].TrimEnd('-', '_', ' ') + "…" : text;
 
     private void AddGameMenuItems(ContextMenu menu, UserPreset preset, SlashToggle button)
     {
@@ -408,7 +426,7 @@ public partial class MainWindow
                 _settings.Save();
                 BuildPresets();
                 _activeGame = null; // re-evaluate on the next focus check
-                StatusText.Text = $"ПРЕСЕТ «{preset.Name.ToUpperInvariant()}» ПРИВЯЗАН К {proc.ToUpperInvariant()}";
+                StatusText.Text = $"ПРЕСЕТ «{preset.Name.ToUpperInvariant()}» ПРИВЯЗАН К {GameName(proc)}";
             };
             menu.Items.Add(mi);
         }
@@ -494,9 +512,9 @@ public partial class MainWindow
         if (hit == null) return;
 
         if (_activeGame == null) _beforeGame = CaptureCurrent(""); // what to return to when they all close
-        ApplyUserPreset(hit, $"{hit.Process!.ToUpperInvariant()} В ФОКУСЕ");
+        ApplyUserPreset(hit, $"{Short(GameName(hit.Process!), 18)} В ФОКУСЕ");
         _activeGame = hit.Process;
-        StatusText.Text = $"{hit.Process!.ToUpperInvariant()} В ФОКУСЕ // ПРЕСЕТ «{hit.Name.ToUpperInvariant()}»";
+        StatusText.Text = $"{GameName(hit.Process!)} В ФОКУСЕ // ПРЕСЕТ «{hit.Name.ToUpperInvariant()}»";
     }
 
     /// <summary>Every ~3 s: once every program with a preset is closed, put the old settings back.</summary>

@@ -399,7 +399,8 @@ public partial class MainWindow : Window
             var preset = p;
             var btn = AddPresetButton(PresetTitle(preset),
                 $"Громкость {preset.Gain:0.#} dB, шумодав {preset.Gate:0.#}, компрессор {preset.Comp:0.#}" +
-                (string.IsNullOrWhiteSpace(preset.DeviceName) ? "" : $"\nМикрофон: {preset.DeviceName}"),
+                (string.IsNullOrWhiteSpace(preset.DeviceName) ? "" : $"\nМикрофон: {preset.DeviceName}") +
+                (string.IsNullOrEmpty(preset.Process) ? "" : $"\nВключается в игре: {preset.Process}.exe"),
                 rnd.Next(-20, 21) / 10.0, () => ApplyUserPreset(preset));
 
             var menu = new ContextMenu();
