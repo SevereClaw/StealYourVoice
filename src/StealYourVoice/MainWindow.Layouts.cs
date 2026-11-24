@@ -111,6 +111,8 @@ public partial class MainWindow
     {
         _settings.SpeakersLayout = key;
         _settings.SpeakerPositions.Clear(); // a fresh arrangement starts from nobody pulled out
+        _settings.SpeakerDocks.Clear();
+        _settings.SpeakerDockOrder.Clear();
         _settings.SpeakersX = _settings.SpeakersY = null; // back to the layout's own spot
         if (_settings.SpeakersCorner == 0) _settings.SpeakersCorner = 1; // picking a layout means "show it"
         _settings.Save();
@@ -177,6 +179,8 @@ public partial class MainWindow
         p.Y = _settings.SpeakersY;
         p.Scale = _settings.SpeakersScale;
         p.Positions = _settings.SpeakerPositions.ToDictionary(kv => kv.Key, kv => (double[])kv.Value.Clone());
+        p.Docks = new Dictionary<string, string>(_settings.SpeakerDocks);
+        p.DockOrder = new List<string>(_settings.SpeakerDockOrder);
     }
 
     private void ApplyMyLayout(SpeakerLayoutPreset p) => ApplyMyLayout(p, false);
@@ -189,12 +193,71 @@ public partial class MainWindow
         _settings.SpeakersY = p.Y;
         _settings.SpeakersScale = p.Scale;
         _settings.SpeakerPositions = p.Positions.ToDictionary(kv => kv.Key, kv => (double[])kv.Value.Clone());
+        _settings.SpeakerDocks = new Dictionary<string, string>(p.Docks ?? new());
+        _settings.SpeakerDockOrder = new List<string>(p.DockOrder ?? new());
         _settings.Save();
         SpkScaleS.Value = Math.Round(p.Scale * 100);
         SpeakersBtn.Text = "КТО ГОВОРИТ: " + CornerNames[_settings.SpeakersCorner];
         MarkLayout();
         if (!quiet) Audio.Sfx.Play("tab");
         UpdateSpeakers();
+    }
+
+    /// <summary>
+    /// Where the index-th person docked into a zone stands (top-left corner of their plate, in DIPs):
+    /// columns at the screen sides from top to bottom, rows at the top / bottom from left to right.
+    /// </summary>
+    private Point DockSpot(string zone, int index, int count)
+    {
+        var a = SystemParameters.WorkArea;
+        double k = _settings.SpeakersScale;
+        double plate = (_settings.SpeakersAvatarsOnly ? 64 : 230) * k, step = 54 * k, gap = 10;
+        switch (zone)
+        {
+            case "left":
+            case "right":
+            {
+                double top = a.Top + Math.Max(12, (a.Height - count * step) / 2);
+                return new Point(zone == "left" ? a.Left + 12 : a.Right - plate - 12, top + index * step);
+            }
+            default:
+            {
+                double width = count * plate + (count - 1) * gap;
+                double left = a.Left + Math.Max(12, (a.Width - width) / 2);
+                double y = zone == "top" ? a.Top + 12 : a.Bottom - 50 * k - 12;
+                return new Point(left + index * (plate + gap), y);
+            }
+        }
+    }
+
+    /// <summary>People present in a zone, in their docking order.</summary>
+    private List<string> DockMembers(string zone, ICollection<string> present)
+    {
+        foreach (var id in _settings.SpeakerDocks.Keys)          // docked without a place in the order → last
+            if (!_settings.SpeakerDockOrder.Contains(id)) _settings.SpeakerDockOrder.Add(id);
+        return _settings.SpeakerDockOrder.Where(id => present.Contains(id) &&
+            _settings.SpeakerDocks.TryGetValue(id, out var z) && z == zone).ToList();
+    }
+
+    /// <summary>Dock a person into a zone, in the place nearest to where they were dropped.</summary>
+    private void DockPerson(string id, string zone, Point dropDip, ICollection<string> present)
+    {
+        _settings.SpeakerPositions.Remove(id);
+        _settings.SpeakerDocks[id] = zone;
+        var others = DockMembers(zone, present).Where(x => x != id).ToList();
+        bool column = zone is "left" or "right";
+        int at = others.Count;
+        for (int i = 0; i < others.Count; i++)
+        {
+            var s = DockSpot(zone, i, others.Count + 1);
+            double k = _settings.SpeakersScale;
+            double centre = column ? s.Y + 27 * k : s.X + (_settings.SpeakersAvatarsOnly ? 32 : 115) * k;
+            if ((column ? dropDip.Y : dropDip.X) < centre) { at = i; break; }
+        }
+        others.Insert(at, id);
+        // the zone's people in their new order, everyone else keeps their place in the list
+        var rest = _settings.SpeakerDockOrder.Where(x => !others.Contains(x)).ToList();
+        _settings.SpeakerDockOrder = rest.Concat(others).ToList();
     }
 
     /// <summary>Where a person stands in the spread-out layouts (null = they go into the shared list).</summary>

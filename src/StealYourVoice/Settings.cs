@@ -37,6 +37,9 @@ public sealed class SpeakerLayoutPreset
     public double? Y { get; set; }
     public double Scale { get; set; } = 1;
     public Dictionary<string, double[]> Positions { get; set; } = new();
+    /// <summary>Who is docked into which zone (left / right / top / bottom) and in what order.</summary>
+    public Dictionary<string, string> Docks { get; set; } = new();
+    public List<string> DockOrder { get; set; } = new();
 }
 
 public sealed class SoundSlot
@@ -158,6 +161,9 @@ public sealed class Settings
 
     /// <summary>People pulled out of the list and parked on their own: user id → [x, y].</summary>
     public Dictionary<string, double[]> SpeakerPositions { get; set; } = new();
+    /// <summary>Ctrl + drag a person into a zone: id → left / right / top / bottom, lined up in DockOrder.</summary>
+    public Dictionary<string, string> SpeakerDocks { get; set; } = new();
+    public List<string> SpeakerDockOrder { get; set; } = new();
 
     /// <summary>How people are laid out: list | row-top | row-bottom | edges | stairs.</summary>
     public string SpeakersLayout { get; set; } = "list";

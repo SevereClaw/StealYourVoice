@@ -41,6 +41,7 @@ public partial class MainWindow
     private readonly Dictionary<string, SpeakersOverlay> _detached = new();
     private SpeakersOverlay? _dragOverlay;
     private string? _dragPerson;
+    private DockZones? _dockZones;      // drop zones shown while one person is dragged
     private bool _dcSelfInChannel;
     private MouseHook? _mouseHook;
     private BannerToast? _joinToast;
@@ -130,6 +131,8 @@ public partial class MainWindow
             _settings.SpeakersCorner = (_settings.SpeakersCorner + 1) % 5;
             _settings.SpeakersX = _settings.SpeakersY = null; // back to a corner
             _settings.SpeakerPositions.Clear();
+            _settings.SpeakerDocks.Clear();
+            _settings.SpeakerDockOrder.Clear();
             _settings.Save();
             SpeakersBtn.Text = "КТО ГОВОРИТ: " + CornerNames[_settings.SpeakersCorner];
             UpdateSpeakers();
@@ -145,6 +148,8 @@ public partial class MainWindow
         SpkGatherBtn.Click += _ =>
         {
             _settings.SpeakerPositions.Clear();
+            _settings.SpeakerDocks.Clear();
+            _settings.SpeakerDockOrder.Clear();
             _settings.Save();
             UpdateSpeakers();
         };
@@ -608,15 +613,46 @@ public partial class MainWindow
                     var k = d.DpiScale;
                     d.MoveTo(_spkStartLeft + (x - _spkDragX) / k, _spkStartTop + (y - _spkDragY) / k);
                 }
+                if (_dragPerson != null && d != null)
+                {
+                    // dragging one person: show the zones they can be docked into
+                    if (_dockZones == null || !_dockZones.IsVisible)
+                    {
+                        _dockZones ??= new DockZones();
+                        _dockZones.ShowZones();
+                        d.Topmost = false; // the dragged plate stays above the zones
+                        d.Topmost = true;
+                    }
+                    _dockZones.SetActive(_dockZones.ZoneAt(x, y));
+                }
                 return false;
             }
             if (msg == MouseHook.WM_LBUTTONUP)
             {
                 var d = _dragOverlay;
                 var person = _dragPerson;
+                var zone = _dockZones?.ZoneAt(x, y);
+                double kz = _dockZones?.DpiScale ?? 1;   // while the window is still shown
+                _dockZones?.Hide();
                 _spkDragging = false;
                 _dragOverlay = null;
                 _dragPerson = null;
+                if (person != null && zone != null)
+                {
+                    // dropped into a zone: dock the person there, the zone lines everyone up
+                    var present = new HashSet<string>(_dcCurrent);
+                    if (_dcUserId != null) present.Add(_dcUserId);
+                    DockPerson(person, zone, new Point(x / kz, y / kz), present);
+                    _settings.Save();
+                    Audio.Sfx.Play("confirm");
+                    UpdateSpeakers();
+                    return true;
+                }
+                if (person != null) // dropped outside the zones: stays where it was let go
+                {
+                    _settings.SpeakerDocks.Remove(person);
+                    _settings.SpeakerDockOrder.Remove(person);
+                }
                 if (d?.CustomPos is { } p)
                 {
                     if (person != null) _settings.SpeakerPositions[person] = new[] { p.X, p.Y };
@@ -940,11 +976,20 @@ public partial class MainWindow
         // people parked on their own get a little window each; the rest stay in the shared list
         var attached = new List<SpeakerInfo>();
         var parked = new HashSet<string>();
-        var free = members.Where(m => !_settings.SpeakerPositions.ContainsKey(m.Id)).ToList();
+        var free = members.Where(m => !_settings.SpeakerPositions.ContainsKey(m.Id) &&
+                                      !_settings.SpeakerDocks.ContainsKey(m.Id)).ToList();
+        var present = members.Select(m => m.Id).ToHashSet();
         foreach (var m in members)
         {
             double[]? pos = null;
-            if (!_settings.SpeakerPositions.TryGetValue(m.Id, out pos) || pos.Length != 2)
+            if (_settings.SpeakerDocks.TryGetValue(m.Id, out var zone) && !_settings.SpeakerPositions.ContainsKey(m.Id))
+            {
+                // docked with Ctrl + drag: lined up in their zone
+                var inZone = DockMembers(zone, present);
+                var spot = DockSpot(zone, Math.Max(0, inZone.IndexOf(m.Id)), Math.Max(1, inZone.Count));
+                pos = new[] { spot.X, spot.Y };
+            }
+            else if (!_settings.SpeakerPositions.TryGetValue(m.Id, out pos) || pos.Length != 2)
             {
                 // spread-out layouts give everyone their own spot; the others share one list
                 var spot = LayoutSpot(free.IndexOf(m), free.Count);
