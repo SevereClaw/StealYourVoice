@@ -18,10 +18,18 @@ public sealed class LinkServer : IDisposable
 
     public LinkServer(Func<string, string> handle) => _handle = handle;
 
+    /// <summary>Сколько входов в канал ждут одновременно. С одним входом, пока панель отвечала на запрос,
+    /// следующий запрос не находил канала, и MidnightClips считал, что панель не запущена (строка в меню Alt+Z
+    /// появлялась через раз).</summary>
+    private const int Listeners = 3;
+
     public void Start()
     {
-        var thread = new Thread(Loop) { IsBackground = true, Name = "link" };
-        thread.Start();
+        for (int i = 0; i < Listeners; i++)
+        {
+            var thread = new Thread(Loop) { IsBackground = true, Name = "link" + i };
+            thread.Start();
+        }
     }
 
     private void Loop()
@@ -30,7 +38,7 @@ public sealed class LinkServer : IDisposable
         {
             try
             {
-                using var pipe = new NamedPipeServerStream(PipeName, PipeDirection.InOut, 4, PipeTransmissionMode.Byte,
+                using var pipe = new NamedPipeServerStream(PipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte,
                     PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
                 pipe.WaitForConnectionAsync(_stop.Token).GetAwaiter().GetResult();
                 string request;

@@ -80,6 +80,10 @@ public partial class MainWindow
                 if (!ApplyPresetByName(name)) return Reply(new { ok = false, error = "нет пресета " + name });
                 StatusText.Text = temp ? $"MIDNIGHT CLIPS: НА ВРЕМЯ ЗАПИСИ — ПРЕСЕТ «{name.ToUpperInvariant()}»" : $"ПРЕСЕТ «{name.ToUpperInvariant()}» ИЗ MIDNIGHT CLIPS";
                 break;
+            case "voices":   // кто говорил в Discord в промежутке [since, until] — для клипа MidnightClips
+                double since = root.TryGetProperty("since", out var a) && a.ValueKind == JsonValueKind.Number ? a.GetDouble() : 0;
+                double until = root.TryGetProperty("until", out var b) && b.ValueKind == JsonValueKind.Number ? b.GetDouble() : double.MaxValue;
+                return Reply(VoicesBetween(since, until));
             case "restore":
                 if (_beforeLink != null && _vm.IsConnected)
                 {
