@@ -172,6 +172,7 @@ public partial class MainWindow
         _capturingHotkey = true;
         _captureFx = false;
         _captureSlot = slot;
+        _captureVoice = null;
         if (_hwnd != IntPtr.Zero) UnregisterHotKey(_hwnd, slot == -2 ? SoundStopHotkeyId : SoundHotkeyBase + slot);
         var text = "НАЖМИ КЛАВИШУ...  (ESC — ОТМЕНА, BACKSPACE — УБРАТЬ)";
         if (slot == -2) BoardStopKeyBtn.Text = text;

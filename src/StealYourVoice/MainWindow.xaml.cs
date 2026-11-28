@@ -97,11 +97,11 @@ public partial class MainWindow : Window
 
         // presets
         BuildPresets();
-        SaveOk.Click += _ => SaveNewPreset();
+        SaveOk.Click += _ => SaveOverlayOk();
         SaveCancel.Click += _ => SaveOverlay.Visibility = Visibility.Collapsed;
         PresetNameBox.KeyDown += (_, e) =>
         {
-            if (e.Key == Key.Enter) SaveNewPreset();
+            if (e.Key == Key.Enter) SaveOverlayOk();
             else if (e.Key == Key.Escape) SaveOverlay.Visibility = Visibility.Collapsed;
         };
 
@@ -160,6 +160,7 @@ public partial class MainWindow : Window
         RegisterMuteHotkey();
         RegisterFxHotkey();
         RegisterSoundHotkeys();
+        RegisterVoiceKeys();
     }
 
     // ───────────────────────── polling ─────────────────────────
@@ -438,9 +439,20 @@ public partial class MainWindow : Window
         return b;
     }
 
+    private bool _savingVoiceSet;   // the name box is for a voice-changer set, not a mic preset
+
+    private void SaveOverlayOk()
+    {
+        if (!_savingVoiceSet) { SaveNewPreset(); return; }
+        if (SaveVoiceSet(PresetNameBox.Text)) SaveOverlay.Visibility = Visibility.Collapsed;
+    }
+
     private void OpenSaveOverlay()
     {
         if (!_vm.IsConnected) return;
+        _savingVoiceSet = false;
+        SaveTitle.Text = "НОВЫЙ ПРЕСЕТ";
+        SaveHint.Text = "Сохранит текущие настройки микрофона и громкость B1";
         PresetNameBox.Text = $"Пресет {_settings.Presets.Count + 1}";
         ShowOverlay(SaveOverlay);
         PresetNameBox.Focus();
@@ -558,6 +570,7 @@ public partial class MainWindow : Window
         _capturingHotkey = true;
         _captureFx = fx;
         _captureSlot = -1;
+        _captureVoice = null;
         if (_hwnd != IntPtr.Zero) UnregisterHotKey(_hwnd, fx ? FxHotkeyId : HotkeyId);
         (fx ? FxHotkeyBtn : HotkeyBtn).Text = "НАЖМИ КЛАВИШУ...  (ESC — ОТМЕНА, BACKSPACE — УБРАТЬ)";
         Activate();
@@ -582,14 +595,18 @@ public partial class MainWindow : Window
             case Key.Escape:
                 _capturingHotkey = false;
                 _captureSlot = -1;
+                if (_captureVoice != null) StatusText.Text = "ОТМЕНЕНО";
+                _captureVoice = null;
                 RegisterMuteHotkey();
                 RegisterFxHotkey();
                 RegisterSoundHotkeys();
+                RegisterVoiceKeys();
                 BuildBoard();
                 return;
             case Key.Back:
                 _capturingHotkey = false;
                 if (FinishSlotCapture(0, 0)) return;
+                if (FinishVoiceCapture(0, 0)) return;
                 if (_captureFx) { _settings.FxHotkeyVk = 0; _settings.FxHotkeyMods = 0; }
                 else { _settings.HotkeyVk = 0; _settings.HotkeyMods = 0; }
                 _settings.Save();
@@ -609,7 +626,7 @@ public partial class MainWindow : Window
         {
             // stay in capture mode and explain
             var msg = $"{key.ToString().ToUpperInvariant()} НЕЛЬЗЯ БЕЗ CTRL/ALT/SHIFT — ДРУГУЮ?";
-            if (_captureSlot != -1) StatusText.Text = msg;
+            if (_captureSlot != -1 || _captureVoice != null) StatusText.Text = msg;
             else (_captureFx ? FxHotkeyBtn : HotkeyBtn).Text = msg;
             Audio.Sfx.Play("cancel");
             return;
@@ -617,6 +634,7 @@ public partial class MainWindow : Window
 
         _capturingHotkey = false;
         if (FinishSlotCapture(KeyInterop.VirtualKeyFromKey(key), mods)) return;
+        if (FinishVoiceCapture(KeyInterop.VirtualKeyFromKey(key), mods)) return;
         if (_captureFx)
         {
             _settings.FxHotkeyVk = KeyInterop.VirtualKeyFromKey(key);
@@ -658,6 +676,7 @@ public partial class MainWindow : Window
             handled = true;
         }
         else if (msg == WM_HOTKEY && OnSoundHotkey(wParam.ToInt32())) handled = true;
+        else if (msg == WM_HOTKEY && OnVoiceHotkey(wParam.ToInt32())) handled = true;
         else if (msg == WM_HOTKEY && OnVolumeKey(wParam.ToInt32())) handled = true;
         return IntPtr.Zero;
     }

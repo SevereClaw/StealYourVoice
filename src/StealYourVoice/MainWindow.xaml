@@ -201,7 +201,7 @@
                                 <WrapPanel x:Name="FxVoicePanel" />
                                 <c:SlashToggle x:Name="FxHotkeyBtn" IsToggle="False" Text="ЭФФЕКТ НА КЛАВИШЕ: НЕТ" FontSize="12" Height="32"
                                                HorizontalAlignment="Left" Margin="0,10,8,0"
-                                               Hint="Глобальная клавиша вкл/выкл эффекта. Нажми и введи комбинацию. Backspace — убрать, Esc — отмена" />
+                                               Hint="Глобальная клавиша вкл/выкл эффекта. Нажми и введи комбинацию. Backspace — убрать, Esc — отмена. Свою клавишу можно дать и каждому голосу — ПКМ по голосу" />
                             </StackPanel>
                         </Border>
                         <Border Grid.Column="2" Style="{StaticResource Card}">
@@ -210,7 +210,7 @@
                             </Border.RenderTransform>
                             <StackPanel>
                                 <TextBlock Style="{StaticResource Header}" Text="НАСТРОЙКА" FontSize="28" />
-                                <TextBlock Text="Подкрути выбранный голос — он станет «СВОЙ»" Foreground="#9A9A9A" FontSize="12" Margin="2,0,0,10" />
+                                <TextBlock Text="Подкрути голос и сохрани его кнопкой «+ СВОЙ НАБОР» слева" Foreground="#9A9A9A" FontSize="12" Margin="2,0,0,10" />
                                 <c:SlashSlider x:Name="FxPitchS" Label="ВЫСОТА" Minimum="-12" Maximum="12" Default="0" Step="1" Unit=" пт" Decimals="0"
                                                Bipolar="True" Hint="Ниже — демон и великан, выше — бурундук. В полутонах" />
                                 <c:SlashSlider x:Name="FxRobotS" Label="РОБОТ" Minimum="0" Maximum="100" Default="0" Step="5" Unit="%" Decimals="0" Margin="0,10,0,0"
@@ -589,8 +589,8 @@
                     <RotateTransform Angle="-1.5" />
                 </Border.RenderTransform>
                 <StackPanel Width="420">
-                    <TextBlock Style="{StaticResource Header}" Text="НОВЫЙ ПРЕСЕТ" />
-                    <TextBlock Text="Сохранит текущие настройки микрофона и громкость B1" Foreground="#9A9A9A" FontSize="12" Margin="2,0,0,12" />
+                    <TextBlock x:Name="SaveTitle" Style="{StaticResource Header}" Text="НОВЫЙ ПРЕСЕТ" />
+                    <TextBlock x:Name="SaveHint" Text="Сохранит текущие настройки микрофона и громкость B1" Foreground="#9A9A9A" FontSize="12" Margin="2,0,0,12" TextWrapping="Wrap" />
                     <TextBox x:Name="PresetNameBox" MaxLength="16" FontFamily="Arial Black" FontSize="20"
                              Background="#1A1A1A" Foreground="#F5F5F5" CaretBrush="#F5F5F5" SelectionBrush="#E60012"
                              BorderBrush="#E60012" BorderThickness="3" Padding="10,6" Margin="0,0,0,16" />

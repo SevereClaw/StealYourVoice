@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using StealYourVoice.Audio;
 using StealYourVoice.Controls;
@@ -31,16 +33,21 @@ public partial class MainWindow
     private const int FxHotkeyId = 0x535A;
     private bool _captureFx;
     private int _captureSlot = -1; // soundboard slot being given a key; -2 = the stop key
+    private string? _captureVoice;  // voice (built-in or own set) being given a key
+    private const int VoiceHotkeyBase = 0x5500, MaxVoiceKeys = 64, MaxVoiceSets = 30;
+    private const string Tweaked = "СВОЙ";   // the sliders were moved by hand and the result isn't saved as a set
+    private readonly List<VoicePreset> _voiceKeyOrder = new();   // hotkey id - base → voice
+
+    /// <summary>Built-in voices first, then the user's own sets.</summary>
+    private IEnumerable<VoicePreset> AllVoices() =>
+        Voices.Concat(_settings.FxSets.Select(x => new VoicePreset(x.Name, x.Pitch, x.Robot, x.Radio, x.Echo, x.Cave, "")));
+
+    private bool IsOwnSet(string name) => _settings.FxSets.Any(x => SameName(x.Name, name));
+    private static bool SameName(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 
     private void InitVoiceFx()
     {
-        foreach (var v in Voices)
-        {
-            var voice = v;
-            var b = new SlashToggle { Text = v.Name, Hint = v.Hint, Height = 36, FontSize = 14, Sound = "", Tilt = (v.Name.Length % 3 - 1) * 1.2 };
-            b.Click += _ => PickVoice(voice);
-            FxVoicePanel.Children.Add(b);
-        }
+        BuildVoices();
 
         FxOnT.Click += t => SetFx(t.IsChecked, true);
         FxListenT.Click += t => _vm.Set(S("A1"), t.IsChecked ? 1 : 0);
@@ -52,7 +59,7 @@ public partial class MainWindow
             {
                 if (_fxApplying) return;
                 set((float)v);
-                _settings.FxVoice = "СВОЙ";
+                _settings.FxVoice = Tweaked;
                 SaveFxParams();
             };
         }
@@ -91,14 +98,210 @@ public partial class MainWindow
         FxCaveS.Value = Math.Round(_settings.FxCave * 100);
         _fxApplying = false;
         PushFxParams();
-        foreach (var t in FxVoicePanel.Children.OfType<SlashToggle>()) t.IsChecked = t.Text == _settings.FxVoice;
+        MarkVoice();
         UpdateFxState();
+    }
+
+    private void MarkVoice()
+    {
+        foreach (var t in FxVoicePanel.Children.OfType<SlashToggle>())
+            if (t.Tag is string name) t.IsChecked = SameName(name, _settings.FxVoice);
+    }
+
+    // ── voices: built-in ones and the user's own sets, each can have its own key ──
+
+    private void BuildVoices()
+    {
+        FxVoicePanel.Children.Clear();
+        int i = 0;
+        foreach (var v in AllVoices())
+        {
+            var voice = v;
+            bool own = IsOwnSet(v.Name);
+            var key = KeyOfVoice(v.Name);
+            var hint = own ? $"Свой набор: высота {v.Pitch:+0;-0;0} пт, робот {v.Robot * 100:0}%, рация {v.Radio * 100:0}%, эхо {v.Echo * 100:0}%, пещера {v.Cave * 100:0}%"
+                           : v.Hint;
+            hint += key != null ? $"\nКлавиша: {KeyName(key.Vk, key.Mods)}" : "";
+            hint += "\nПКМ — назначить клавишу" + (own ? ", перезаписать или удалить" : "");
+            var b = new SlashToggle
+            {
+                Text = v.Name + (key != null ? $"  [{KeyName(key.Vk, key.Mods)}]" : ""), Tag = v.Name, Hint = hint,
+                Height = 36, FontSize = 14, Sound = "", Tilt = (i++ % 3 - 1) * 1.2,
+            };
+            b.Click += _ => PickVoice(voice);
+
+            var menu = new ContextMenu();
+            var bind = new MenuItem { Header = key != null ? "Другая клавиша…" : "Назначить клавишу…" };
+            bind.Click += (_, _) => StartVoiceCapture(voice.Name);
+            menu.Items.Add(bind);
+            if (key != null)
+            {
+                var unbind = new MenuItem { Header = $"Убрать клавишу {KeyName(key.Vk, key.Mods)}" };
+                unbind.Click += (_, _) => SetVoiceKey(voice.Name, 0, 0);
+                menu.Items.Add(unbind);
+            }
+            if (own)
+            {
+                var overwrite = new MenuItem { Header = "Перезаписать текущими ползунками" };
+                overwrite.Click += (_, _) => SaveVoiceSet(voice.Name);
+                var delete = new MenuItem { Header = "Удалить набор" };
+                delete.Click += (_, _) => DeleteVoiceSet(voice.Name);
+                menu.Items.Add(overwrite);
+                menu.Items.Add(delete);
+            }
+            b.ContextMenu = menu;
+            FxVoicePanel.Children.Add(b);
+        }
+
+        var add = new SlashToggle
+        {
+            Text = "+ СВОЙ НАБОР", IsToggle = false, Height = 36, FontSize = 14, Tilt = 1.5,
+            Hint = "Сохранить то, что сейчас на ползунках «НАСТРОЙКА», своим голосом — с именем и своей клавишей",
+        };
+        add.Click += _ => OpenVoiceSetOverlay();
+        FxVoicePanel.Children.Add(add);
+        MarkVoice();
+    }
+
+    private VoiceKey? KeyOfVoice(string name) => _settings.FxKeys.FirstOrDefault(k => SameName(k.Name, name) && k.Vk != 0);
+
+    private void OpenVoiceSetOverlay()
+    {
+        if (_settings.FxSets.Count >= MaxVoiceSets) { StatusText.Text = $"СВОИХ НАБОРОВ УЖЕ {MaxVoiceSets} — УДАЛИ ЛИШНИЙ (ПКМ)"; return; }
+        _savingVoiceSet = true;
+        SaveTitle.Text = "НОВЫЙ ГОЛОС";
+        SaveHint.Text = $"Сохранит ползунки «НАСТРОЙКА»: высота {_settings.FxPitch:+0;-0;0} пт, робот {_settings.FxRobot * 100:0}%, " +
+                        $"рация {_settings.FxRadio * 100:0}%, эхо {_settings.FxEcho * 100:0}%, пещера {_settings.FxCave * 100:0}%";
+        PresetNameBox.Text = $"ГОЛОС {_settings.FxSets.Count + 1}";
+        ShowOverlay(SaveOverlay);
+        PresetNameBox.Focus();
+        PresetNameBox.SelectAll();
+    }
+
+    /// <summary>Save the sliders as an own set (a new one, or over the set with this name).</summary>
+    private bool SaveVoiceSet(string name)
+    {
+        name = name.Trim().ToUpperInvariant();
+        if (name.Length == 0) return false;
+        if (Voices.Any(v => SameName(v.Name, name)) || SameName(name, Tweaked))
+        {
+            StatusText.Text = $"«{name}» — ЭТО ВСТРОЕННЫЙ ГОЛОС, ПРИДУМАЙ ДРУГОЕ ИМЯ";
+            Audio.Sfx.Play("cancel");
+            return false;
+        }
+        var set = new VoiceSet
+        {
+            Name = name, Pitch = _settings.FxPitch, Robot = _settings.FxRobot, Radio = _settings.FxRadio,
+            Echo = _settings.FxEcho, Cave = _settings.FxCave,
+        };
+        int i = _settings.FxSets.FindIndex(x => SameName(x.Name, name));
+        if (i >= 0) _settings.FxSets[i] = set;
+        else _settings.FxSets.Add(set);
+        _settings.FxVoice = name;   // it's what's on the sliders right now
+        _settings.Save();
+        BuildVoices();
+        RegisterVoiceKeys();
+        UpdateFxState();
+        ShowPresetBanner(i >= 0 ? "ГОЛОС ПЕРЕЗАПИСАН" : "ГОЛОС СОХРАНЁН", name);
+        return true;
+    }
+
+    private void DeleteVoiceSet(string name)
+    {
+        _settings.FxSets.RemoveAll(x => SameName(x.Name, name));
+        _settings.FxKeys.RemoveAll(k => SameName(k.Name, name));
+        if (SameName(_settings.FxVoice, name)) _settings.FxVoice = Tweaked;   // the sliders keep the sound, it just has no name now
+        _settings.Save();
+        BuildVoices();
+        RegisterVoiceKeys();
+        UpdateFxState();
+        StatusText.Text = $"НАБОР «{name}» УДАЛЁН";
+    }
+
+    private void StartVoiceCapture(string name)
+    {
+        _capturingHotkey = true;
+        _captureFx = false;
+        _captureSlot = -1;
+        _captureVoice = name;
+        if (_hwnd != IntPtr.Zero)
+            for (int i = 0; i < MaxVoiceKeys; i++) UnregisterHotKey(_hwnd, VoiceHotkeyBase + i);   // the old key of this voice must not fire
+        StatusText.Text = $"КЛАВИША ДЛЯ ГОЛОСА «{name}»: НАЖМИ КЛАВИШУ...  (ESC — ОТМЕНА, BACKSPACE — УБРАТЬ)";
+        Activate();
+        Keyboard.Focus(this);
+    }
+
+    /// <summary>Called by the shared key-capture code. Returns true if a voice key was being set.</summary>
+    private bool FinishVoiceCapture(int vk, int mods)
+    {
+        if (_captureVoice == null) return false;
+        var name = _captureVoice;
+        _captureVoice = null;
+        SetVoiceKey(name, vk, mods);
+        return true;
+    }
+
+    private void SetVoiceKey(string name, int vk, int mods)
+    {
+        _settings.FxKeys.RemoveAll(k => SameName(k.Name, name));
+        string? taken = null;
+        if (vk != 0)
+        {
+            // one key — one voice: the key moves here from whatever voice had it
+            foreach (var k in _settings.FxKeys.Where(k => k.Vk == vk && k.Mods == mods).ToList())
+            {
+                taken = k.Name;
+                _settings.FxKeys.Remove(k);
+            }
+            _settings.FxKeys.Add(new VoiceKey { Name = name, Vk = vk, Mods = mods });
+        }
+        _settings.Save();
+        BuildVoices();
+        var failed = RegisterVoiceKeys();
+        StatusText.Text = vk == 0 ? $"У ГОЛОСА «{name}» БОЛЬШЕ НЕТ КЛАВИШИ"
+            : failed.Contains(name) ? $"{KeyName(vk, mods)} ЗАНЯТА ДРУГОЙ ПРОГРАММОЙ — ВЫБЕРИ ДРУГУЮ (ПКМ ПО ГОЛОСУ)"
+            : $"ГОЛОС «{name}» НА КЛАВИШЕ {KeyName(vk, mods)}" + (taken != null ? $" (У «{taken}» ОНА СНЯТА)" : "");
+    }
+
+    /// <summary>Register every voice key. Returns the voices whose key Windows refused (taken by another program).</summary>
+    private HashSet<string> RegisterVoiceKeys()
+    {
+        var failed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (_hwnd == IntPtr.Zero) return failed;
+        for (int i = 0; i < MaxVoiceKeys; i++) UnregisterHotKey(_hwnd, VoiceHotkeyBase + i);
+        _voiceKeyOrder.Clear();
+        _settings.FxKeys.RemoveAll(k => !AllVoices().Any(v => SameName(v.Name, k.Name)));   // voice was deleted
+        foreach (var k in _settings.FxKeys.Where(k => k.Vk != 0))
+        {
+            if (_voiceKeyOrder.Count >= MaxVoiceKeys) break;
+            var voice = AllVoices().First(v => SameName(v.Name, k.Name));
+            if (RegisterHotKey(_hwnd, VoiceHotkeyBase + _voiceKeyOrder.Count, (uint)k.Mods | 0x4000, (uint)k.Vk))
+                _voiceKeyOrder.Add(voice);
+            else
+            {
+                failed.Add(k.Name);
+                _voiceKeyOrder.Add(voice);   // keep ids in step; this one just never fires
+            }
+        }
+        return failed;
+    }
+
+    /// <summary>A voice key: switch to that voice; the same voice again while it's on — effect off.</summary>
+    private bool OnVoiceHotkey(int id)
+    {
+        if (id < VoiceHotkeyBase || id >= VoiceHotkeyBase + MaxVoiceKeys) return false;
+        int i = id - VoiceHotkeyBase;
+        if (i >= _voiceKeyOrder.Count) return true;
+        var voice = _voiceKeyOrder[i];
+        if (_settings.FxOn && SameName(_settings.FxVoice, voice.Name)) SetFx(false, true);
+        else PickVoice(voice);
+        return true;
     }
 
     private void SaveFxParams()
     {
         PushFxParams();
-        foreach (var t in FxVoicePanel.Children.OfType<SlashToggle>()) t.IsChecked = false;
+        MarkVoice();
         UpdateFxState();
         _settings.Save();
     }

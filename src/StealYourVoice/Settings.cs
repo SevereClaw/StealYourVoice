@@ -42,6 +42,25 @@ public sealed class SpeakerLayoutPreset
     public List<string> DockOrder { get; set; } = new();
 }
 
+/// <summary>A voice-changer set the user saved from the sliders.</summary>
+public sealed class VoiceSet
+{
+    public string Name { get; set; } = "";
+    public float Pitch { get; set; }
+    public float Robot { get; set; }
+    public float Radio { get; set; }
+    public float Echo { get; set; }
+    public float Cave { get; set; }
+}
+
+/// <summary>Global key that switches to a voice (built-in or the user's own), by the voice's name.</summary>
+public sealed class VoiceKey
+{
+    public string Name { get; set; } = "";
+    public int Vk { get; set; }
+    public int Mods { get; set; }
+}
+
 public sealed class SoundSlot
 {
     public string Name { get; set; } = "";
@@ -87,6 +106,8 @@ public sealed class Settings
     public float FxEcho { get; set; }
     public float FxCave { get; set; } = 0.3f;
     public int FxHotkeyVk { get; set; }
+    public List<VoiceSet> FxSets { get; set; } = new();
+    public List<VoiceKey> FxKeys { get; set; } = new();
 
     // soundboard
     public List<SoundSlot> Sounds { get; set; } = new();
