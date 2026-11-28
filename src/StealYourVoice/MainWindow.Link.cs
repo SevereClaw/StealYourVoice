@@ -116,6 +116,8 @@ public partial class MainWindow
             presets,
             active = _activePreset,
             temp = _beforeLink != null,
+            // само устройство микрофона (вход Voicemeeter): MidnightClips пишет с него ещё и голос без эффекта
+            micDevice = connected ? (_vm.GetString(S("device.name")) ?? "").Trim() : "",
         });
     }
 
